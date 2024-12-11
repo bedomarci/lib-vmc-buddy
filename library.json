@@ -1,0 +1,46 @@
+{
+    "name": "VMC Buddy",
+    "version": "1.0.0",
+    "description": "Library for the VMC Buddy PCB, providing basic functionalities for ESP32-WROOM-32D-H4 with Arduino framework.",
+    "keywords": [
+      "esp32",
+      "arduino",
+      "vmc-buddy",
+      "embedded",
+      "library"
+    ],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/bedomarci/lib-vmc-buddy"
+    },
+    "authors": [
+      {
+        "name": "Bedő Marci",
+        "email": "bedomarci@gmail.com",
+        "maintainer": true
+      }
+    ],
+    "frameworks": ["arduino"],
+    "platforms": ["espressif32"],
+    "dependencies": {
+        "arkhipenko/TaskScheduler": "^3.3.0",
+        "thijse/ArduinoLog": "^1.1.1"
+    },
+    "build": {
+      "flags": [
+        "-DDEBUG_VMC_BUDDY",
+        "-DESP32"
+      ]
+    },
+    "examples": [
+      "examples/*"
+    ],
+    "export": {
+      "include": [  
+        "src/*",
+        "README.md",
+        "LICENSE"
+      ]
+    }
+  }
+  
