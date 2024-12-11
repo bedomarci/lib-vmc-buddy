@@ -1,5 +1,6 @@
 lib-vmc-buddy.code-workspace
 .pio/
+.idea/
 
 # Prerequisites
 *.d
