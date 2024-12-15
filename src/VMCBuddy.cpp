@@ -24,11 +24,11 @@ namespace VMCBuddy
     }
 
 
-    void VMCBuddy::blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime)
+    void VMCBuddy::blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime, int delay)
     {
         setLed(ledIndex, LOW);
         auto* led = new LedBlinker(this, scheduler, ledIndex, numberOfBlinks, onTime, offTime);
-        led->enable();
+        led->enableDelayed(delay);
     }
 
     void VMCBuddy::sendPulse(uint8_t pinIndex, int numberOfPulse, int onTime, int offTime)
@@ -75,7 +75,7 @@ namespace VMCBuddy
     }
 
 
-    void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode)
+    void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode, uint16_t debounce)
     {
         index = constrain(index, 1, NUM_PULSE) - 1;
         if (initialized)
@@ -89,7 +89,7 @@ namespace VMCBuddy
             Log.errorln("Pulse line is not an INPUT. Change configuration!");
             return;
         }
-        PulseReader::setInterruptMode(index, mode);
+        PulseReader::setInterruptMode(index, mode, debounce);
     }
 
 

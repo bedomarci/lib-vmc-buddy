@@ -24,13 +24,13 @@ namespace VMCBuddy
         void digitalWritePulsePin(uint8_t index, uint8_t value);
         void pinModePulse(uint8_t index, uint8_t mode);
         void setOnEventCallback(std::function<void(uint8_t, int)> callback);
-        void blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime);
+        void blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime, int delay = 0);
         void sendPulse(uint8_t pulseIndex, int numberOfPulse, int onTime, int offTime);
 
         // void blinkLed();
 
         // Initialize the library
-        void setPulseInterruptMode(uint8_t index, uint8_t mode);
+        void setPulseInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce = DEFAULT_PULSE_DEBOUNCE);
         void begin();
 
 
