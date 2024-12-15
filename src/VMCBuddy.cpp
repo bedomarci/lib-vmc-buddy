@@ -1,162 +1,125 @@
 #include "VMCBuddy.h"
 
-// Constructor
-VMCBuddy::VMCBuddy(Scheduler* scheduler, Print* serial)
-    : scheduler(scheduler),
-      serial(serial)
-{
-}
 
-void VMCBuddy::registerInterrupts()
+#include <TaskScheduler.h>
+#include <AnalogButtonReader.h>
+#include <PulseReader.h>
+#include <LedBlinker.h>
+#include <PulseWriter.h>
+
+namespace VMCBuddy
 {
-    for (const auto& pinInterrupt : pinInterrupts)
+    // Constructor
+    VMCBuddy::VMCBuddy(Scheduler* scheduler, Print* serial)
+        : scheduler(scheduler),
+          serial(serial)
     {
-        uint8_t pin = pinInterrupt.first;
-        uint8_t mode = pinInterrupt.second;
-
-        if (mode)
+        if (!this->serial)
         {
-            //TODO valahogy paramterezni kell az interrupotot
-            //attachInterrupt(pin, [=]() {VMCBuddy::handleInterrupts(pin); }, mode);
+            this->serial = &Serial;
         }
-        else
+        Log.begin(LOG_LEVEL_VERBOSE, this->serial);
+        pulseReader = new PulseReader();
+        analogButtonReader = new AnalogButtonReader();
+    }
+
+
+    void VMCBuddy::blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime)
+    {
+        setLed(ledIndex, LOW);
+        auto* led = new LedBlinker(this, scheduler, ledIndex, numberOfBlinks, onTime, offTime);
+        led->enable();
+    }
+
+    void VMCBuddy::sendPulse(uint8_t pinIndex, int numberOfPulse, int onTime, int offTime)
+    {
+        auto* pulse = new PulseWriter(this, scheduler, pinIndex, numberOfPulse, onTime, offTime);
+        pulse->enable();
+    }
+
+    // Initialization method
+    void VMCBuddy::begin()
+    {
+
+        for (const auto& it : pinConfiguration)
         {
-            detachInterrupt(pin);
+            pinMode(it.first, it.second);
         }
-    }
-}
 
-// Initialization method
-void VMCBuddy::begin()
-{
-    if (!this->serial)
-    {
-        this->serial = &Serial;
-    }
-    Log.begin(LOG_LEVEL_VERBOSE, this->serial);
+        for (uint8_t pin : ledPins)
+            setLed(pin, LOW);
 
-    for (const auto& it : pinConfiguration)
-    {
-        pinMode(it.first, it.second);
+
+        this->scheduler->addTask(*this->pulseReader);
+        this->scheduler->addTask(*this->analogButtonReader);
+        this->analogButtonReader->enable();
+        this->pulseReader->enable();
+        initialized = true;
     }
 
-    for (uint8_t pin : ledPins)
-        setLed(pin, LOW);
 
-    registerInterrupts();
-
-
-    taskReadAnalogButtons = new Task(TIME_ANALOG_BUTTON_READ_INTERVAL, TASK_FOREVER,
-                                     [this]() { this->readAnalogButtons(); });
-    this->scheduler->addTask(*this->taskReadAnalogButtons);
-    this->taskReadAnalogButtons->enable();
-    initialized = true;
-}
-
-void VMCBuddy::trigger(VMCBuddy::Event event, int value)
-{
-    if (this->onEventCallback)
+    void VMCBuddy::render()
     {
-        onEventCallback(event, value);
-    }
-}
-
-void VMCBuddy::render()
-{
-    digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
-
-    // Loop through the 16 bits
-    for (int i = 0; i < LEN_SHIFT_REGISTER_BITS; ++i)
-    {
-        // Write the bit to the data pin
-        digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, shiftRegisterBits[i] ? HIGH : LOW);
-
-        // Pulse the clock to shift the bit
-        digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
-        digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
-    }
-
-    // End transmission: Pull latch high
-    digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
-}
-
-void VMCBuddy::handleInterrupts(uint8_t pin)
-{
-    for (const auto& pinInterrupt : this->pinInterrupts)
-    {
-        // inputValues[pin] = digitalRead(pin);
-        //TODO azokat az elemeket, amik valtoznak, meg kell jelolni dirtynek, hogy kesobb egy TASK fel tudja dolgozni a valtozasokat.
-    }
-    // trigger((value) ? INPUT_RAISE : INPUT_FALL, pin);
-}
-
-void VMCBuddy::setInterruptMode(const uint8_t pin, const uint8_t mode)
-{
-    if (initialized)
-    {
-        Log.errorln("Interrupts must be registered before initialiyation. Move setInterruptMode() above begin(). ");
-        return;
-    }
-    pinInterrupts[pin] = mode;
-}
-
-void VMCBuddy::readAnalogButtons()
-{
-    this->newAnalogButtonReadValue = analogRead(PIN_MCU_ANALOG_BTNS);
-    int delta = abs(this->newAnalogButtonReadValue - this->oldAnalogButtonReadValue);
-    if (delta > TOLERANCE_ANALOG_BUTTONS_CHANGE)
-    {
-        if (this->newAnalogButtonReadValue < TOLERANCE_ANALOG_BUTTONS_CHANGE)
+        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
+        // Loop through the 16 bits
+        for (unsigned char shiftRegisterBit : shiftRegisterBits)
         {
-            trigger(BUTTON_RELEASE, 0);
+            // Write the bit to the data pin
+            digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, shiftRegisterBit ? HIGH : LOW);
+            // Pulse the clock to shift the bit
+            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
+            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
         }
-        else
-        {
-            for (int i = 0; i < NUM_BUTTONS; i++)
-            {
-                if (this->newAnalogButtonReadValue > VMCBuddy::analogButtonValues[i] - TOLERANCE_ANALOG_BUTTONS_CHANGE
-                    &&
-                    this->newAnalogButtonReadValue < VMCBuddy::analogButtonValues[i] + TOLERANCE_ANALOG_BUTTONS_CHANGE)
-                {
-                    trigger(BUTTON_PRESS, i);
-                }
-            }
-        }
+        // End transmission: Pull latch high
+        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
     }
-    this->oldAnalogButtonReadValue = this->newAnalogButtonReadValue;
-}
 
-void VMCBuddy::setOnEventCallback(std::function<void(uint8_t, int)> callback)
-{
-    this->onEventCallback = callback;
-}
 
-void VMCBuddy::setShiftRegisterBit(uint8_t index, uint8_t value)
-{
-    this->shiftRegisterBits[index] = value;
-    this->render();
-}
-
-void VMCBuddy::setLed(uint8_t index, uint8_t value)
-{
-    index = constrain(index, 1, NUM_LEDS) - 1;
-    this->setShiftRegisterBit(this->ledPins[index], !value);
-}
-
-void VMCBuddy::digitalWritePulse(uint8_t index, uint8_t value)
-{
-    index = constrain(index, 1, NUM_PULSE) - 1;
-    if (pulsePinMode[index] == INPUT) return;
-    this->setShiftRegisterBit(this->pulseOutPins[index], value);
-}
-
-void VMCBuddy::pinModePulse(uint8_t index, uint8_t mode)
-{
-    index = constrain(index, 1, NUM_PULSE) - 1;
-    pulsePinMode[index] = mode;
-
-    if (mode == INPUT)
+    void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode)
     {
-        setShiftRegisterBit(pulseOutPins[index], 0);
+        index = constrain(index, 1, NUM_PULSE) - 1;
+        if (initialized)
+        {
+            Log.errorln("Interrupts must be registered before initialiyation. Move setInterruptMode() above begin(). ");
+            return;
+        }
+
+        if (pulsePinMode[index] != INPUT)
+        {
+            Log.errorln("Pulse line is not an INPUT. Change configuration!");
+            return;
+        }
+        PulseReader::setInterruptMode(index, mode);
+    }
+
+
+    void VMCBuddy::setShiftRegisterBit(uint8_t index, uint8_t value)
+    {
+        this->shiftRegisterBits[index] = value;
+        this->render();
+    }
+
+    void VMCBuddy::setLed(uint8_t index, uint8_t value)
+    {
+        index = constrain(index, 1, NUM_LEDS) - 1;
+        this->setShiftRegisterBit(this->ledPins[index], !value);
+    }
+
+    void VMCBuddy::digitalWritePulsePin(uint8_t index, uint8_t value)
+    {
+        index = constrain(index, 1, NUM_PULSE) - 1;
+        if (pulsePinMode[index] == INPUT) return;
+        this->setShiftRegisterBit(this->pulseOutPins[index], value);
+    }
+
+    void VMCBuddy::pinModePulse(uint8_t index, uint8_t mode)
+    {
+        index = constrain(index, 1, NUM_PULSE) - 1;
+        pulsePinMode[index] = mode;
+
+        if (mode == INPUT)
+        {
+            setShiftRegisterBit(pulseOutPins[index], 0);
+        }
     }
 }
