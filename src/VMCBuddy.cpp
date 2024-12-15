@@ -40,7 +40,6 @@ namespace VMCBuddy
     // Initialization method
     void VMCBuddy::begin()
     {
-
         for (const auto& it : pinConfiguration)
         {
             pinMode(it.first, it.second);
@@ -55,6 +54,8 @@ namespace VMCBuddy
         this->analogButtonReader->enable();
         this->pulseReader->enable();
         initialized = true;
+
+        Log.infoln("VMCBuddy initialized.");
     }
 
 
@@ -108,7 +109,11 @@ namespace VMCBuddy
     void VMCBuddy::digitalWritePulsePin(uint8_t index, uint8_t value)
     {
         index = constrain(index, 1, NUM_PULSE) - 1;
-        if (pulsePinMode[index] == INPUT) return;
+        if (pulsePinMode[index] == INPUT)
+        {
+            Log.errorln("Pin #%i is in INPUT mode. You can not write out!", index + 1);
+            return;
+        }
         this->setShiftRegisterBit(this->pulseOutPins[index], value);
     }
 

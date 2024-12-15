@@ -59,6 +59,7 @@ namespace VMCBuddy
 
     inline void PulseReader::setInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce)
     {
+        Log.verboseln("Interrupt set for %d", index);
         pulseBuffer[index].interruptMode = mode;
         pulseBuffer[index].debounce = debounce;
     }
@@ -102,14 +103,16 @@ namespace VMCBuddy
         {
             hasInterrupts |= (pulse.interruptMode != DETACH_ISR);
         }
-        if (hasInterrupts) Log.verboseln("There are interrupts attached!");
+        if (hasInterrupts) Log.verboseln("There are interrupts attached on pulse input lines.");
         return hasInterrupts;
     }
 
     inline void PulseReader::handleInterrupts(const uint8_t pulseIndex)
     {
+        // if (pulseBuffer[pulseIndex].interruptMode != INPUT) return;
         const unsigned long now = millis();
         const unsigned long delta = now - pulseBuffer[pulseIndex].lastInterrupt;
+        // Log.verboseln("INT %i", pulseIndex+1);
         if (delta > pulseBuffer[pulseIndex].debounce)
         {
             pulseBuffer[pulseIndex].value = digitalRead(pulseBuffer[pulseIndex].pin);
@@ -120,15 +123,13 @@ namespace VMCBuddy
 
     inline void PulseReader::checkDirty()
     {
-        // for (Pulse& pulse : PulseReader::pulseBuffer)
         for (int i = 0; i < LEN_PIN_INTERRUPTS; i++)
         {
-            if (PulseReader::pulseBuffer[i].isDirty)
+            if (pulseBuffer[i].isDirty)
             {
-                // Log.verboseln("Dirty found %i", i);
                 EventHandler::trigger(Event::PULSE_INT, pulseBuffer[i].index + 1, pulseBuffer[i].value,
                                       pulseBuffer[i].interruptMode);
-                Log.verboseln("Interrupt timer\t%l", PulseReader::pulseBuffer[i].isDirty);
+                Log.verboseln("Interrupt dirty at \t%i", PulseReader::pulseBuffer[i].index+1);
                 PulseReader::pulseBuffer[i].isDirty = false;
             }
         }
