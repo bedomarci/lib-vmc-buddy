@@ -2,13 +2,14 @@
 #define PulseWriter_H
 #include <TaskScheduler.h>
 #include <VMCBuddy.h>
+#include <IO.h>
 
 namespace VMCBuddy
 {
     class PulseWriter : public Task
     {
     public:
-        PulseWriter(VMCBuddy* board, Scheduler* scheduler, uint8_t pinIndex, uint16_t numberOfPulse, uint16_t onTime,
+        PulseWriter(Scheduler* scheduler, uint8_t pinIndex, uint16_t numberOfPulse, uint16_t onTime,
                     uint16_t offTime);
         ~PulseWriter() override;
 
@@ -23,15 +24,14 @@ namespace VMCBuddy
         TaskCallback onCallback = [this]() { turnOn(); };
         TaskCallback offCallback = [this]() { turnOff(); };
 
-        VMCBuddy* board;
         Scheduler* scheduler;
     };
 
-    inline PulseWriter::PulseWriter(VMCBuddy* board, Scheduler* scheduler, uint8_t pinIndex, uint16_t numberOfPulse,
+    inline PulseWriter::PulseWriter(Scheduler* scheduler, uint8_t pinIndex, uint16_t numberOfPulse,
                                     uint16_t onTime, uint16_t offTime) :
         Task(),
         numberOfPulse(numberOfPulse), onTime(onTime), offTime(offTime),
-        pinIndex(pinIndex), board(board), scheduler(scheduler)
+        pinIndex(pinIndex), scheduler(scheduler)
     {
         setIterations(numberOfPulse * 2);
         setCallback(onCallback);
@@ -62,7 +62,7 @@ namespace VMCBuddy
 
     inline void PulseWriter::writeOut(uint8_t state)
     {
-        board->digitalWritePulsePin(pinIndex, state);
+        IO::digitalWritePulse(pinIndex, state);
     }
 } // VMCBuddy
 

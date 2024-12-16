@@ -6,6 +6,7 @@
 #include <PulseReader.h>
 #include <LedBlinker.h>
 #include <PulseWriter.h>
+#include <IO.h>
 
 namespace VMCBuddy
 {
@@ -23,30 +24,29 @@ namespace VMCBuddy
         analogButtonReader = new AnalogButtonReader();
     }
 
-
     void VMCBuddy::blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime, int delay)
     {
-        setLed(ledIndex, LOW);
-        auto* led = new LedBlinker(this, scheduler, ledIndex, numberOfBlinks, onTime, offTime);
+        IO::setLed(ledIndex, LOW);
+        auto* led = new LedBlinker(scheduler, ledIndex, numberOfBlinks, onTime, offTime);
         led->enableDelayed(delay);
     }
 
     void VMCBuddy::sendPulse(uint8_t pinIndex, int numberOfPulse, int onTime, int offTime)
     {
-        auto* pulse = new PulseWriter(this, scheduler, pinIndex, numberOfPulse, onTime, offTime);
+        auto* pulse = new PulseWriter(scheduler, pinIndex, numberOfPulse, onTime, offTime);
         pulse->enable();
     }
 
     // Initialization method
     void VMCBuddy::begin()
     {
-        for (const auto& it : pinConfiguration)
+        for (const auto& it : context()->pinConfiguration)
         {
             pinMode(it.first, it.second);
         }
 
-        for (uint8_t pin : ledPins)
-            setLed(pin, LOW);
+        for (uint8_t i = 1; i <= NUM_LEDS; i++)
+            IO::setLed(i, LOW);
 
 
         this->scheduler->addTask(*this->pulseReader);
@@ -59,23 +59,6 @@ namespace VMCBuddy
     }
 
 
-    void VMCBuddy::render()
-    {
-        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
-        // Loop through the 16 bits
-        for (unsigned char shiftRegisterBit : shiftRegisterBits)
-        {
-            // Write the bit to the data pin
-            digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, shiftRegisterBit ? HIGH : LOW);
-            // Pulse the clock to shift the bit
-            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
-            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
-        }
-        // End transmission: Pull latch high
-        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
-    }
-
-
     void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode, uint16_t debounce)
     {
         index = constrain(index, 1, NUM_PULSE) - 1;
@@ -85,7 +68,7 @@ namespace VMCBuddy
             return;
         }
 
-        if (pulsePinMode[index] != INPUT)
+        if (context()->pulseConfiguration[index].pinMode != INPUT)
         {
             Log.errorln("Pulse line is not an INPUT. Change configuration!");
             return;
@@ -94,37 +77,26 @@ namespace VMCBuddy
     }
 
 
-    void VMCBuddy::setShiftRegisterBit(uint8_t index, uint8_t value)
+    Context* VMCBuddy::context()
     {
-        this->shiftRegisterBits[index] = value;
-        this->render();
+        return Context::getInstance();
     }
 
-    void VMCBuddy::setLed(uint8_t index, uint8_t value)
-    {
-        index = constrain(index, 1, NUM_LEDS) - 1;
-        this->setShiftRegisterBit(this->ledPins[index], !value);
-    }
-
-    void VMCBuddy::digitalWritePulsePin(uint8_t index, uint8_t value)
-    {
-        index = constrain(index, 1, NUM_PULSE) - 1;
-        if (pulsePinMode[index] == INPUT)
-        {
-            Log.errorln("Pin #%i is in INPUT mode. You can not write out!", index + 1);
-            return;
-        }
-        this->setShiftRegisterBit(this->pulseOutPins[index], value);
-    }
-
+    // void VMCBuddy::setLed(uint8_t index, uint8_t value)
+    // {
+    //     index = constrain(index, 1, NUM_LEDS) - 1;
+    //     ShiftRegisterWriter::setBit(context()->ledPins[index], !value);
+    //     IO
+    // }
+    //
+    // void VMCBuddy::digitalWritePulsePin(uint8_t index, uint8_t value)
+    // {
+    //     index = constrain(index, 1, NUM_PULSE) - 1;
+    //
+    // }
+    //
     void VMCBuddy::pinModePulse(uint8_t index, uint8_t mode)
     {
-        index = constrain(index, 1, NUM_PULSE) - 1;
-        pulsePinMode[index] = mode;
-
-        if (mode == INPUT)
-        {
-            setShiftRegisterBit(pulseOutPins[index], 0);
-        }
+        IO::pinModePulse(index, mode);
     }
 }

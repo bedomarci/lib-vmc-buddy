@@ -4,6 +4,7 @@
 #include <EventHandler.h>
 #include <TaskScheduler.h>
 #include <VMCBuddy.h>
+#include <IO.h>
 
 namespace VMCBuddy
 {
@@ -16,26 +17,6 @@ namespace VMCBuddy
         static bool registerInterrupts();
 
     protected:
-        struct Pulse
-        {
-            uint8_t index;
-            uint8_t pin;
-            uint8_t interruptMode;
-            uint8_t value;
-            bool isDirty = false;
-            unsigned long lastInterrupt = 0;
-            uint16_t debounce;
-
-            // Constructor
-            Pulse(uint8_t index = 0, uint8_t pin = 0, uint8_t interruptMode = 0,
-                  uint16_t debounce = DEFAULT_PULSE_DEBOUNCE)
-                : index(index), pin(pin), interruptMode(interruptMode), debounce(debounce)
-            {
-            }
-        };
-
-        static Pulse pulseBuffer[LEN_PIN_INTERRUPTS];
-
         void static handleInterrupts(uint8_t pulseIndex);
     };
 
@@ -45,61 +26,59 @@ namespace VMCBuddy
         setIterations(TASK_FOREVER);
         setCallback([]() { PulseReader::checkDirty(); });
         setOnEnable([this]()-> bool { return PulseReader::registerInterrupts(); });
-        PulseReader::pulseBuffer[0] = Pulse(0,PIN_MCU_PULSE_IN1,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[1] = Pulse(1,PIN_MCU_PULSE_IN2,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[2] = Pulse(2,PIN_MCU_PULSE_IN3,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[3] = Pulse(3,PIN_MCU_PULSE_IN4,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[4] = Pulse(4,PIN_MCU_PULSE_IN5,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[5] = Pulse(5,PIN_MCU_PULSE_IN6,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[6] = Pulse(6,PIN_MCU_PULSE_IN7,DEFAULT_ISR_MODE);
-        PulseReader::pulseBuffer[7] = Pulse(7,PIN_MCU_PULSE_IN8,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[0] = Pulse(0,PIN_MCU_PULSE_IN1,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[1] = Pulse(1,PIN_MCU_PULSE_IN2,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[2] = Pulse(2,PIN_MCU_PULSE_IN3,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[3] = Pulse(3,PIN_MCU_PULSE_IN4,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[4] = Pulse(4,PIN_MCU_PULSE_IN5,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[5] = Pulse(5,PIN_MCU_PULSE_IN6,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[6] = Pulse(6,PIN_MCU_PULSE_IN7,DEFAULT_ISR_MODE);
+        // Context::getInstance()->pulseConfiguration[7] = Pulse(7,PIN_MCU_PULSE_IN8,DEFAULT_ISR_MODE);
     }
-
-    PulseReader::Pulse PulseReader::pulseBuffer[LEN_PIN_INTERRUPTS];
 
     inline void PulseReader::setInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce)
     {
         Log.verboseln("Interrupt set for %d", index);
-        pulseBuffer[index].interruptMode = mode;
-        pulseBuffer[index].debounce = debounce;
+        Context::getInstance()->pulseConfiguration[index].interruptMode = mode;
+        Context::getInstance()->pulseConfiguration[index].debounce = debounce;
     }
 
     inline bool PulseReader::registerInterrupts()
     {
-        if (pulseBuffer[0].interruptMode)
-            attachInterrupt(pulseBuffer[0].pin,
+        if (Context::getInstance()->pulseConfiguration[0].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[0].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(0); },
-                            pulseBuffer[0].interruptMode);
-        if (pulseBuffer[1].interruptMode)
-            attachInterrupt(pulseBuffer[1].pin,
+                            Context::getInstance()->pulseConfiguration[0].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[1].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[1].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(1); },
-                            pulseBuffer[1].interruptMode);
-        if (pulseBuffer[2].interruptMode)
-            attachInterrupt(pulseBuffer[2].pin,
+                            Context::getInstance()->pulseConfiguration[1].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[2].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[2].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(2); },
-                            pulseBuffer[2].interruptMode);
-        if (pulseBuffer[3].interruptMode)
-            attachInterrupt(pulseBuffer[3].pin,
+                            Context::getInstance()->pulseConfiguration[2].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[3].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[3].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(3); },
-                            pulseBuffer[3].interruptMode);
-        if (pulseBuffer[4].interruptMode)
-            attachInterrupt(pulseBuffer[4].pin,
+                            Context::getInstance()->pulseConfiguration[3].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[4].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[4].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(4); },
-                            pulseBuffer[4].interruptMode);
-        if (pulseBuffer[5].interruptMode)
-            attachInterrupt(pulseBuffer[5].pin,
+                            Context::getInstance()->pulseConfiguration[4].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[5].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[5].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(5); },
-                            pulseBuffer[5].interruptMode);
-        if (pulseBuffer[6].interruptMode)
-            attachInterrupt(pulseBuffer[6].pin,
+                            Context::getInstance()->pulseConfiguration[5].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[6].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[6].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(6); },
-                            pulseBuffer[6].interruptMode);
-        if (pulseBuffer[7].interruptMode)
-            attachInterrupt(pulseBuffer[7].pin,
+                            Context::getInstance()->pulseConfiguration[6].interruptMode);
+        if (Context::getInstance()->pulseConfiguration[7].interruptMode)
+            attachInterrupt(Context::getInstance()->pulseConfiguration[7].pin,
                             []()IRAM_ATTR { PulseReader::handleInterrupts(7); },
-                            pulseBuffer[7].interruptMode);
+                            Context::getInstance()->pulseConfiguration[7].interruptMode);
         bool hasInterrupts = false;
-        for (const auto pulse : pulseBuffer)
+        for (const auto pulse : Context::getInstance()->pulseConfiguration)
         {
             hasInterrupts |= (pulse.interruptMode != DETACH_ISR);
         }
@@ -109,15 +88,16 @@ namespace VMCBuddy
 
     inline void PulseReader::handleInterrupts(const uint8_t pulseIndex)
     {
-        // if (pulseBuffer[pulseIndex].interruptMode != INPUT) return;
+        if (Context::getInstance()->pulseConfiguration[pulseIndex].pinMode != INPUT) return;
         const unsigned long now = millis();
-        const unsigned long delta = now - pulseBuffer[pulseIndex].lastInterrupt;
+        const unsigned long delta = now - Context::getInstance()->pulseConfiguration[pulseIndex].lastInterrupt;
         // Log.verboseln("INT %i", pulseIndex+1);
-        if (delta > pulseBuffer[pulseIndex].debounce)
+        if (delta > Context::getInstance()->pulseConfiguration[pulseIndex].debounce)
         {
-            pulseBuffer[pulseIndex].value = digitalRead(pulseBuffer[pulseIndex].pin);
-            pulseBuffer[pulseIndex].isDirty = true;
-            pulseBuffer[pulseIndex].lastInterrupt = now;
+            Context::getInstance()->pulseConfiguration[pulseIndex].value = digitalRead(
+                Context::getInstance()->pulseConfiguration[pulseIndex].pin);
+            Context::getInstance()->pulseConfiguration[pulseIndex].isDirty = true;
+            Context::getInstance()->pulseConfiguration[pulseIndex].lastInterrupt = now;
         }
     }
 
@@ -125,12 +105,13 @@ namespace VMCBuddy
     {
         for (int i = 0; i < LEN_PIN_INTERRUPTS; i++)
         {
-            if (pulseBuffer[i].isDirty)
+            if (Context::getInstance()->pulseConfiguration[i].isDirty)
             {
-                EventHandler::trigger(Event::PULSE_INT, pulseBuffer[i].index + 1, pulseBuffer[i].value,
-                                      pulseBuffer[i].interruptMode);
-                Log.verboseln("Interrupt dirty at \t%i", PulseReader::pulseBuffer[i].index+1);
-                PulseReader::pulseBuffer[i].isDirty = false;
+                EventHandler::trigger(Event::PULSE_INT, Context::getInstance()->pulseConfiguration[i].index + 1,
+                                      Context::getInstance()->pulseConfiguration[i].value,
+                                      Context::getInstance()->pulseConfiguration[i].interruptMode);
+                Log.verboseln("Interrupt dirty at \t%i", Context::getInstance()->pulseConfiguration[i].index + 1);
+                Context::getInstance()->pulseConfiguration[i].isDirty = false;
             }
         }
     }
