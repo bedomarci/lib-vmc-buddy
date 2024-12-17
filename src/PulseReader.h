@@ -38,7 +38,7 @@ namespace VMCBuddy
 
     inline void PulseReader::setInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce)
     {
-        Log.verboseln("Interrupt set for %d", index);
+        Log.verboseln("Interrupt set for %d", index+1);
         Context::getInstance()->pulseConfiguration[index].interruptMode = mode;
         Context::getInstance()->pulseConfiguration[index].debounce = debounce;
     }
@@ -107,10 +107,10 @@ namespace VMCBuddy
         {
             if (Context::getInstance()->pulseConfiguration[i].isDirty)
             {
-                EventHandler::trigger(Event::PULSE_INT, Context::getInstance()->pulseConfiguration[i].index + 1,
+                EventHandler::trigger(Event::PULSE_INT, Context::getInstance()->pulseConfiguration[i].index,
                                       Context::getInstance()->pulseConfiguration[i].value,
                                       Context::getInstance()->pulseConfiguration[i].interruptMode);
-                Log.verboseln("Interrupt dirty at \t%i", Context::getInstance()->pulseConfiguration[i].index + 1);
+                // Log.verboseln("Interrupt dirty at \t%i", Context::getInstance()->pulseConfiguration[i].index);
                 Context::getInstance()->pulseConfiguration[i].isDirty = false;
             }
         }

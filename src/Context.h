@@ -19,7 +19,7 @@ namespace VMCBuddy
         uint16_t debounce;
 
         // Constructor
-        Pulse(uint8_t index = 0, uint8_t pin = 0, uint8_t interruptMode = 0,
+        Pulse(uint8_t index = 0, uint8_t pin = 0, uint8_t interruptMode = DEFAULT_ISR_MODE,
               uint16_t debounce = DEFAULT_PULSE_DEBOUNCE)
             : index(index), pin(pin), interruptMode(interruptMode), debounce(debounce)
         {
@@ -45,6 +45,8 @@ namespace VMCBuddy
 
         // Provides access to the singleton instance
         static Context* getInstance();
+
+        bool initialized = false;
 
         uint8_t shiftRegisterBits[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 

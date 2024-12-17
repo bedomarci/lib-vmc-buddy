@@ -37,9 +37,10 @@ namespace VMCBuddy
         int delta = abs(this->newAnalogButtonReadValue - this->oldAnalogButtonReadValue);
         if (delta > TOLERANCE_ANALOG_BUTTONS_CHANGE)
         {
+            Log.verboseln("Analog button value changed from %i to %i", this->oldAnalogButtonReadValue, this->newAnalogButtonReadValue );
             if (this->newAnalogButtonReadValue < TOLERANCE_ANALOG_BUTTONS_CHANGE)
             {
-                EventHandler::trigger(Event::BUTTON_RELEASE, 0);
+                EventHandler::trigger(Event::BUTTON_RELEASE, -1);
             }
             else
             {
@@ -51,7 +52,7 @@ namespace VMCBuddy
                         this->newAnalogButtonReadValue < analogButtonValues[i] +
                         TOLERANCE_ANALOG_BUTTONS_CHANGE)
                     {
-                        EventHandler::trigger(Event::BUTTON_PRESS, i + 1);
+                        EventHandler::trigger(Event::BUTTON_PRESS, i);
                     }
                 }
             }

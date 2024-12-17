@@ -18,8 +18,8 @@ namespace VMCBuddy
 
     inline void IO::pinModePulse(uint8_t index, uint8_t mode)
     {
-        index = constrain(index, 1, NUM_PULSE) - 1;
-        Context::getInstance()->pulseConfiguration[index] = mode;
+        // index = constrain(index, 1, NUM_PULSE) - 1;
+        Context::getInstance()->pulseConfiguration[index].pinMode = mode;
 
         if (mode == INPUT)
         {
@@ -29,13 +29,13 @@ namespace VMCBuddy
 
     inline void IO::digitalWritePulse(uint8_t index, uint8_t state)
     {
-        index = constrain(index, 1, NUM_PULSE) - 1;
+        // index = constrain(index, 1, NUM_PULSE) - 1;
         if (Context::getInstance()->pulseConfiguration[index].pinMode == INPUT)
         {
             Log.errorln("Pin #%i is in INPUT mode. You can not write out!", index + 1);
             return;
         }
-        setShiftRegisterBit(Context::getInstance()->pulseConfiguration[index].pin, state);
+        setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], state);
     }
 
     inline void IO::setShiftRegisterBit(uint8_t index, uint8_t value)
@@ -46,24 +46,24 @@ namespace VMCBuddy
 
     inline void IO::setLed(uint8_t index, uint8_t value)
     {
-        index = constrain(index, 1, NUM_LEDS) - 1;
+        // index = constrain(index, 1, NUM_LEDS) - 1;
         setShiftRegisterBit(Context::getInstance()->ledPins[index], !value);
     }
 
     inline void IO::render()
     {
-        digitalWritePulse(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
+        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
         // Loop through the 16 bits
         for (unsigned char shiftRegisterBit : Context::getInstance()->shiftRegisterBits)
         {
             // Write the bit to the data pin
-            digitalWritePulse(PIN_MCU_SHIFTREGISTER_DATA, shiftRegisterBit ? HIGH : LOW);
+            digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, shiftRegisterBit ? HIGH : LOW);
             // Pulse the clock to shift the bit
-            digitalWritePulse(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
-            digitalWritePulse(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
+            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
+            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
         }
         // End transmission: Pull latch high
-        digitalWritePulse(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
+        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
     }
 } // VMCBuddy
 

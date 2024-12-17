@@ -45,7 +45,7 @@ namespace VMCBuddy
             pinMode(it.first, it.second);
         }
 
-        for (uint8_t i = 1; i <= NUM_LEDS; i++)
+        for (uint8_t i = 0; i < NUM_LEDS; i++)
             IO::setLed(i, LOW);
 
 
@@ -53,24 +53,25 @@ namespace VMCBuddy
         this->scheduler->addTask(*this->analogButtonReader);
         this->analogButtonReader->enable();
         this->pulseReader->enable();
-        initialized = true;
 
+
+        context()->initialized = true;
         Log.infoln("VMCBuddy initialized.");
     }
 
 
     void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode, uint16_t debounce)
     {
-        index = constrain(index, 1, NUM_PULSE) - 1;
-        if (initialized)
+        // index = constrain(index, 1, NUM_PULSE) - 1;
+        if (context()->initialized)
         {
-            Log.errorln("Interrupts must be registered before initialiyation. Move setInterruptMode() above begin(). ");
+            Log.errorln("Interrupts must be registered before initialization. Move setInterruptMode() above begin(). ");
             return;
         }
 
         if (context()->pulseConfiguration[index].pinMode != INPUT)
         {
-            Log.errorln("Pulse line is not an INPUT. Change configuration!");
+            Log.errorln("Pulse line %i is not an INPUT. Change configuration!", index+1);
             return;
         }
         PulseReader::setInterruptMode(index, mode, debounce);
