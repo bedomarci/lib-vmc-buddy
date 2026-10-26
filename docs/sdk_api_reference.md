@@ -15,7 +15,7 @@ This reference reflects the implementation currently present in `src/`, not ever
 | RS-485 | SP3485 transceiver | **No RS-485 API** |
 | RS-232 | Dual SP3232EEY transceiver | **No RS-232 API** |
 
-Hardware GPIO/net details: [Hardware Interfaces](./hardware_interfaces.md). MDB jumper wiring: [Configuration Guide](./configuration_guide.md).
+Board GPIO/net details: [Hardware Interfaces](./hardware_interfaces.md). Jumper wiring: [Jumper Configuration](./jumper_configuration.md). Browse all board and SDK pages from the [documentation index](./README.md).
 
 ## Main class: `VMCBuddy::VMCBuddy`
 

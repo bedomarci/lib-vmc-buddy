@@ -59,7 +59,7 @@ graph TB
 
 > **Galvanic isolation:** MDB signal circuitry uses B0505S-1WR2 (`MDB-VCC5V` / `GND-MDB`) and LTV-817S optocouplers. Connector and power routing are detailed in the [schematic-based hardware guide](./docs/hardware_interfaces.md).
 >
-> **Revision note:** Schematic names MDB mode jumpers U25/U26 (U32/U35 are optocouplers) and routes `RS485-TX-EN` to GPIO15. See [configuration](./docs/configuration_guide.md) and [hardware details](./docs/hardware_interfaces.md) before wiring.
+> **Production board:** Hardware documentation follows the October 26, 2026 schematic set. See the [jumper configuration](./docs/jumper_configuration.md) and [hardware overview](./docs/hardware_interfaces.md) before wiring.
 
 ---
 
@@ -67,7 +67,7 @@ graph TB
 
 | Interface | Hardware | Electrical details | SDK support |
 |-----------|----------|-------------------|-------------|
-| **MDB** | Master / Slave routing via U25/U26 | Isolated signal domain (B0505S + LTV-817S) | None |
+| **MDB** | Solder-selectable master/slave routing | Isolated signal domain (B0505S + LTV-817S) | None |
 | **Wiegand In** | D0/D1 input | 5V-side input, 74HC14D-conditioned TTL | None |
 | **Wiegand Out** | D0/D1 open-drain | 2N7002, SM05T1G-ES, external pull-up | None |
 | **RS-485** | Half-duplex SP3485 | 3.3V logic, PSM712, 120Ω termination/bias | None |
@@ -87,14 +87,6 @@ lib-vmc-buddy/
 ├── LICENSE                            ← GPL-3.0
 ├── platformio.ini                     ← Root project config
 ├── library.json                       ← PlatformIO library manifest
-├── schematic/                         ← Schematic exports (PNG)
-│   ├── SCH_Schematic3_1-power_2026-10-15.png
-│   ├── SCH_Schematic3_2-mcu_2026-10-15.png
-│   ├── SCH_Schematic3_3-RS232-RS485-interface_2026-10-15.png
-│   ├── SCH_Schematic3_4-pulse-interfaces_2026-10-15.png
-│   ├── SCH_Schematic3_5-MDB-interface_2026-10-15.png
-│   ├── SCH_Schematic3_6-Wiegand-interface_2026-10-15.png
-│   └── SCH_Schematic3_7-misc-interfaces_2026-10-15.png
 ├── src/                               ← Library source
 │   ├── VMCBuddy.h / VMCBuddy.cpp      ← Main public API
 │   ├── Context.h                      ← Singleton runtime state
@@ -110,12 +102,17 @@ lib-vmc-buddy/
 │   ├── onboard-led/                   ← LED walk test
 │   └── onboard-keys/                  ← Button event demo
 └── docs/
-    ├── hardware_interfaces.md         ← Per-interface pinouts & operation
-    ├── configuration_guide.md         ← Jumper settings & modes
-    └── sdk_api_reference.md           ← Full API reference
+    ├── README.md                       ← Documentation index
+    ├── schematics/                     ← Production schematic exports (2026-10-26)
+    ├── jumper_configuration.md         ← Through-hole and solder jumpers
+    ├── hardware_interfaces.md          ← Board overview, pulse I/O, pin map
+    ├── MDB.md / Wiegand.md             ← Interface details
+    ├── RS232.md / RS485.md             ← Interface details
+    ├── configuration_guide.md          ← Setup entry point
+    └── sdk_api_reference.md            ← SDK API and limitations
 ```
 
-`images/` is currently empty; no PCB layout or board-photo images are committed. The seven PNG schematic sheets in `schematic/` are the available hardware drawings and are linked from the docs.
+The seven PNG schematic sheets in `docs/schematics/` are the production hardware drawings. They are linked from the [documentation index](./docs/README.md).
 
 ---
 
@@ -187,8 +184,10 @@ board.blink(0, 5, 300, 100);               // LED #1, 5 blinks
 
 ## Documentation
 
-- [Hardware Interfaces](./docs/hardware_interfaces.md) — Pinouts, electrical operation, protection circuitry
-- [Configuration Guide](./docs/configuration_guide.md) — Solder jumpers, master/slave setup, practical examples
+- [Documentation index](./docs/README.md) — Board and SDK documents
+- [Hardware Interfaces](./docs/hardware_interfaces.md) — Board overview, pulse I/O, pin mapping
+- [Jumper Configuration](./docs/jumper_configuration.md) — Through-hole and solder jumper maps
+- [Configuration Guide](./docs/configuration_guide.md) — Setup entry point
 - [SDK API Reference](./docs/sdk_api_reference.md) — Full class hierarchy, method signatures, code examples
 
 ---

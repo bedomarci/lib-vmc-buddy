@@ -5,14 +5,17 @@ plan status: done
 ---
 
 ## Idea
-Create complete English-language technical documentation for the VMC Buddy ESP32-based vending machine gateway SDK. Documentation covers: (1) README.md with overview, block diagram, features matrix, project structure, quickstart; (2) docs/hardware_interfaces.md with detailed per-interface pinouts, electrical operation, and schematic references; (3) docs/configuration_guide.md with jumper settings, master/slave modes, example configs; (4) docs/sdk_api_reference.md with exact API signatures, class descriptions, usage examples. All content based on existing source code, macro definitions, and user-provided hardware descriptions.
+Maintain complete English-language technical documentation for the production VMC Buddy ESP32 board and Arduino SDK. The October 26, 2026 schematic set is the hardware source of truth. Keep overview, interface details, jumper settings, configuration entry points, and SDK API information linked without repeating technical explanations.
 
 ## Implementation
-- Create README.md with project overview, Mermaid block diagram, features matrix, project structure, and quickstart guide
-- Create docs/hardware_interfaces.md with per-interface chapters: MDB, Wiegand, RS485, RS232, Pulse I/O with pinout tables and operation principles
-- Create docs/configuration_guide.md with U32/U35 jumper tables, header jumpers, and practical master/slave config examples
-- Create docs/sdk_api_reference.md with exact API signatures, class hierarchy, event system, and usage examples
-- Verify all file references, cross-links between docs, and consistency with source code macros/APIs
+- Keep README.md as project entry point and link to docs/README.md
+- Keep docs/README.md as documentation and schematic index
+- Keep docs/hardware_interfaces.md focused on board overview, shared pin mapping, pulse I/O, and power
+- Keep interface details and connector pinouts in MDB.md, Wiegand.md, RS232.md, and RS485.md
+- Keep docs/configuration_guide.md as a setup index; document the 2x15 through-hole field and solder jumpers in docs/jumper_configuration.md
+- Keep docs/configuration_guide.md as a short setup entry point; document SDK behavior in sdk_api_reference.md
+- Keep docs/sdk_api_reference.md as the source of truth for implemented API, examples, and limitations
+- Verify relative links, anchors, schematic references, and mappings against the production sheets
 
 ## Required Specs
 <!-- SPECS_START -->
