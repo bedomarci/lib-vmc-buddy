@@ -9,6 +9,7 @@ This reference reflects the implementation currently present in `src/`, not ever
 | Pulse inputs | 8 optocoupled channels | `setPulseInterruptMode()` and event bus |
 | Pulse outputs | 8 optocoupler-driven channels | `PulseWriter::sendPulses()` |
 | Pulse IDC connectors | Two connectors for input groups 1–3 and 4–6 | `PulseIDC` mapping adapter |
+| Pulse terminal | 10-pin connector for channels 1–8 | `PulseTerminal` with selectable mode/inhibit |
 | Onboard LEDs | 6 LEDs via 74HC595D | `Led::set()` and `Led::blink()` |
 | Analog buttons | 6-button resistor ladder | Internal polling; `EventHandler` events |
 | MDB | Isolated transceiver/optocouplers | `MDB` and `MDBPeripheral` classes |
@@ -81,6 +82,12 @@ bool blink(uint8_t ledIndex, uint16_t count, uint16_t onTimeMs,
 
 `blink()` reuses `PulseWriter`'s restartable phase task; it returns false for an invalid LED index or pulse parameters.
 
+## Shared pulse direction: `PulsePeripheral`
+
+`PulsePeripheral` is the common `IPeripheral`/`PulseWriter` base for `PulseIDC` and `PulseTerminal`. `Mode::Slave` configures mapped board channels as inputs; `Mode::Master` configures them as outputs. It provides `setMode()`, `read()`, `setInterruptMode()`, inherited `sendPulses()`, and inhibit selection/control. `setInhibitChannel(1..channelCount)` selects the inhibit channel; zero disables it. Select mode and configure input interrupts before `VMCBuddy::begin()`.
+
+Master output uses the separate `PULSE-OUT-TTL-CHx` shift-register path. The production schematic does not electrically route that output back to either input connector.
+
 ## Pulse IDC connectors
 
 `PulseIDC` represents either 2×5 connector and exposes local roles CH1, CH2, and INHIBIT. Select connector 1 or 2 and Master or Slave mode at construction:
@@ -107,7 +114,18 @@ The connector's physical `PULSE-EXT` nets are optoisolated inputs. In Master mod
 | `readInhibit()` | Read local INHIBIT in Slave mode |
 | `pulseIndex(localChannel)` / `gpio(localChannel)` / `idcPin(localChannel)` | Resolve local role to board channel, GPIO, or IDC contact |
 
-The class maps connector 1 local roles to zero-based pulse indexes 0–2 and connector 2 roles to indexes 3–5. Register each `PulseIDC` plus one shared `PulseReader` with VMCBuddy.
+The constructor is `PulseIDC(uint8_t connectorNumber, Mode mode=Mode::Slave, uint8_t inhibitChannel=3)`. It maps connector 1 local roles to zero-based pulse indexes 0–2 and connector 2 roles to indexes 3–5. The default inhibit role is the third local channel. Register each `PulseIDC` plus one shared `PulseReader` with VMCBuddy.
+
+## Pulse terminal connector
+
+`PulseTerminal` uses the same `PulsePeripheral` Master/Slave and INHIBIT API for the 10-pin terminal. Local channels 1–8 map directly to board channels 1–8. Select one optional local channel (1–8) as INHIBIT in the constructor; zero disables inhibit:
+
+```cpp
+VMCBuddy::PulseTerminal terminal(VMCBuddy::PulsePeripheral::Mode::Slave, 8);
+board.addPeripheral(&terminal);
+```
+
+Terminal pins 1–8 carry external pulse channels 1–8; pin 9 is `VCC-IN`, pin 10 is `GND`. Constructor: `PulseTerminal(Mode mode=Mode::Slave, uint8_t inhibitChannel=0)`. `read()`, `setInterruptMode()`, `sendPulses()`, `readInhibit()`, and `setInhibit()` follow the selected direction. Master outputs use separate `PULSE-OUT-TTL-CHx` nets; the schematic does not connect them back to this terminal.
 
 ### Declared, currently not implemented
 

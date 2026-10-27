@@ -61,7 +61,7 @@ The two 2×5 IDC group connectors split pulse inputs by group; channels 7–8 ar
 | 8 | `PULSE-EXT-CH1` | `PULSE-EXT-CH4` |
 | 3, 5, 7, 9, 10 | NC | NC |
 
-The [`PulseIDC` class](./sdk_api_reference.md#pulse-idc-connectors) maps local CH1, CH2, and INHIBIT roles to these nets for either connector and applies the selected Master/Slave direction mode. In Master mode its outputs use the separate `PULSE-OUT-TTL-CHx` shift-register paths; the schematic does not connect those outputs to the IDC pins.
+[`PulseIDC`](./sdk_api_reference.md#pulse-idc-connectors) maps local CH1, CH2, and INHIBIT roles to either IDC group. [`PulseTerminal`](./sdk_api_reference.md#pulse-terminal-connector) maps all eight terminal channels and can mark any one as INHIBIT. Both support Master/Slave software direction. Master outputs use the separate `PULSE-OUT-TTL-CHx` shift-register paths; the schematic does not connect those outputs to the IDC or terminal input pins.
 
 `CON-RELAY` is a four-pin connector: `VCC5V`, pulse channel 7, pulse channel 8, and `GND` on pins 1–4 respectively. The connector exposes these pulse nets; it does not add a separate relay driver.
 
