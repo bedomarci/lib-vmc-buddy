@@ -91,11 +91,14 @@ lib-vmc-buddy/
 │   ├── VMCBuddy.h / VMCBuddy.cpp      ← Main public API
 │   ├── Context.h                      ← Singleton runtime state
 │   ├── EventHandler.h                 ← Event bus (subscribe/trigger)
-│   ├── IO.h                           ← Shift register & GPIO I/O
+│   ├── IO.h                           ← Pulse GPIO and shift-register I/O
+│   ├── IPeripheral.h / ISerial.h       ← Scheduler and serial interfaces
 │   ├── PulseReader.h                  ← ISR-based pulse input
 │   ├── PulseWriter.h                  ← Pulse output generator
-│   ├── LedBlinker.h                   ← LED blink controller
+│   ├── Led.h                          ← Onboard LED controller
 │   ├── AnalogButtonReader.h           ← ADC button reader
+│   ├── MDB*.h / RS*.h                  ← Serial interface layers
+│   ├── CommandInterpreter.h            ← UART command parser
 │   └── macros.h                       ← All pin definitions & constants
 ├── examples/
 │   ├── pulse-out/                     ← Pulse output + LED toggle
@@ -142,15 +145,25 @@ pio device monitor --baud 115200
 
 ```cpp
 #include <Arduino.h>
-#include <TaskScheduler.h>
 #include <VMCBuddy.h>
+#include <TaskScheduler.h>
+#include <PulseReader.h>
+#include <AnalogButtonReader.h>
+#include <Led.h>
 
 Scheduler scheduler;
 VMCBuddy::VMCBuddy board(&scheduler);
+VMCBuddy::PulseReader pulseInputs;
+VMCBuddy::AnalogButtonReader buttons;
+VMCBuddy::Led leds;
 
 void setup() {
     Serial.begin(115200);
-    board.begin();          // Initialize all I/O, start tasks
+    board.addPeripheral(&pulseInputs);
+    board.addPeripheral(&buttons);
+    board.addPeripheral(&leds);
+    board.begin();
+    leds.blink(0, 3, 200, 200);
 }
 
 void loop() {
@@ -161,15 +174,17 @@ void loop() {
 ### Key APIs at a Glance
 
 ```cpp
-// Implemented SDK pulse output
+VMCBuddy::PulseWriter pulses;
+VMCBuddy::Led leds;
+board.addPeripheral(&pulses); // before board.begin()
+board.addPeripheral(&leds);
 board.pinModePulse(7, OUTPUT);
-board.sendPulse(7, 3, 500, 200);           // 3 pulses, 500ms on, 200ms off
-
-// Implemented SDK LED blink
-board.blink(0, 5, 300, 100);               // LED #1, 5 blinks
+board.begin();
+pulses.sendPulses(7, 3, 500, 200);          // 3 pulses, 500ms high, 200ms pause
+leds.blink(0, 5, 300, 100);                 // LED index 0, five blinks
 ```
 
-`setOnEventCallback()` and `digitalWritePulsePin()` are declared but not implemented. Pulse interrupt setup has an uninitialized mode-state issue; see [SDK limitations](./docs/sdk_api_reference.md#current-source-limitations).
+`setOnEventCallback()` is declared but not implemented. Pulse interrupt setup has an uninitialized mode-state issue; see [SDK limitations](./docs/sdk_api_reference.md#current-source-limitations).
 
 ---
 

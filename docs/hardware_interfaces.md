@@ -12,7 +12,7 @@ Board-level overview based on the production [October 26, 2026 schematics](./REA
 | RS-485 | Half-duplex transceiver with fixed bus termination and bias | [RS-485](./RS485.md) |
 | Pulse I/O | Eight optoisolated inputs and eight shift-register/opto output paths | [Pulse I/O](#pulse-io) |
 
-The SDK currently implements pulse, LED, and button functions only. See [SDK API Reference](./sdk_api_reference.md) for support status.
+The SDK currently implements pulse, LED, button, RS-232, RS-485, MDB, and command-interpreter functions. See [SDK API Reference](./sdk_api_reference.md) for full support status.
 
 ## Power
 
@@ -50,7 +50,7 @@ Each input channel uses an optocoupler and has a corresponding MCU-side `PULSE-I
 
 The 10-pin `CON-PULSE-TERMINAL` maps pins 1–8 to external pulse channels 1–8, pin 9 to `VCC-IN`, and pin 10 to `GND`.
 
-The two 10-pin group connectors expose channel nets and their raw supply:
+The two 10-pin group connectors split channels by group: connector 1 carries channels 1–3, connector 2 carries channels 4–6, and channels 7–8 are on CON-RELAY. Each group also exposes its dedicated raw supply net:
 
 | Pin | Pulse group 1 | Pulse group 2 |
 |---:|---|---|
@@ -71,7 +71,7 @@ The two 10-pin group connectors expose channel nets and their raw supply:
 | 7–2 | On-board LEDs 1–6, respectively |
 | 1–0 | Unassigned in the SDK |
 
-The MCU drives the 16-bit chain by bit-banging data, clock, and latch signals; no hardware SPI peripheral is used. SDK APIs and timing units are documented in the [API reference](./sdk_api_reference.md).
+The MCU drives the two-cascaded 74HC595D chain by bit-banging data, clock, and latch signals; no hardware SPI peripheral is used. SDK APIs and timing units are documented in the [API reference](./sdk_api_reference.md).
 
 ## Auxiliary connectors
 
@@ -87,6 +87,8 @@ Six pins: `VCC3V`, Wiegand D0 output TTL, Wiegand D1 output TTL, `GPIO2`, `GPIO1
 
 ## ESP32 pin map
 
+The table below covers application-level GPIOs. UART0 pins (TXD0, RXD0), GPIO0, GPIO2, and GPIO12 are accessible through the programming and GPIO connectors but are not listed here.
+
 ![Production board MCU schematic](./schematics/SCH_Schematic3_2-mcu_2026-10-26.png)
 
 | GPIO | Board function |
@@ -96,8 +98,8 @@ Six pins: `VCC3V`, Wiegand D0 output TTL, Wiegand D1 output TTL, `GPIO2`, `GPIO1
 | 13 | Shift-register data |
 | 14 | Pulse input 7 |
 | 15 | RS-485 direction control |
+| 18 / 19 | RS-232 channel 1 TX / RX nets |
 | 17 / 16 | RS-232 channel 2 TX / RX nets |
-| 18 / 19 | RS-232 channel 1 RX / TX nets |
 | 21 | Shift-register latch |
 | 22 / 23 | Wiegand D1 / D0 output control |
 | 25 / 26 / 27 | Pulse inputs 3 / 2 / 1 |

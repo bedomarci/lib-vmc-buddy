@@ -17,4 +17,4 @@ Use the dedicated [Jumper Configuration](./jumper_configuration.md) page for the
 3. Check the jumper guide for shared power nets and the MDB ground-isolation consequence.
 4. Reapply power only after verifying the intended source and interface routing.
 
-The schematics do not document factory shunt positions. The SDK currently has no MDB, Wiegand, RS-232, or RS-485 protocol configuration API; see the [SDK API Reference](./sdk_api_reference.md).
+The schematics do not document factory shunt positions. The SDK provides RS-232, RS-485, and MDB interface classes; Wiegand still requires direct GPIO access. See the [SDK API Reference](./sdk_api_reference.md).

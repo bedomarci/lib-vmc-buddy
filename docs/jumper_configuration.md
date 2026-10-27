@@ -11,7 +11,7 @@ The 30-pin field (U34 in the schematic) is arranged as 15 adjacent pin pairs. A 
 | 1–2 | `VCC-EXT` ↔ `VCC-IN` | Route external DC input to the board input rail |
 | 3–4 | `VCC-PULSE-1-RAW` ↔ `VCC-IN` | Route board input rail to pulse supply group 1 |
 | 5–6 | `VCC-PULSE-2-RAW` ↔ `VCC-IN` | Route board input rail to pulse supply group 2 |
-| 7–8 | `VCC-MDB` ↔ `VCC-IN` | Route MDB supply to the board input rail |
+| 7–8 | `VCC-MDB` (raw MDB bus voltage) ↔ `VCC-IN` | Route MDB bus supply to the board input rail |
 | 9–10 | `GND-MDB` ↔ `GND` | Join isolated MDB ground to board ground |
 | 11–12 | `VCC-RS232-1` ↔ `VCC5V` | Supply the RS-232 channel 1 connector rail |
 | 13–14 | `VCC-RS232-2` ↔ `VCC5V` | Supply the RS-232 channel 2 connector rail |
@@ -30,6 +30,7 @@ The 30-pin field (U34 in the schematic) is arranged as 15 adjacent pin pairs. A 
 - Pins 15–16 and 17–18 select alternate sources for the same pulse pull-up net. Do not install both shunts; that would connect `VCC-IN` to `VCC5V` through the shared net.
 - For UART2, populate only the receive/transmit pair for the intended interface. The header does not select the UART in firmware.
 - Pins 9–10 directly join `GND-MDB` and `GND`; installing that shunt removes galvanic isolation between those grounds.
+- Pins 7–8 carry the raw MDB bus supply (`VCC-MDB`) — not the isolated DC-DC converter output (`MDB-VCC5V`). The schematic routes `VCC-MDB` → `VCC-IN` for the board's power path; the isolated `MDB-VCC5V` rail is generated separately from `VCC5V` and stays in the MDB signal domain.
 - The schematic defines the nets but does not specify factory shunt positions. Identify pin 1 from the board marking before fitting shunts.
 
 ## MDB mode solder jumpers
