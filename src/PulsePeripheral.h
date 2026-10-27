@@ -7,8 +7,8 @@
 namespace VMCBuddy {
 
 /** Shared direction and inhibit behavior for pulse connectors.
- * Slave mode reads optoisolated inputs; Master mode writes the
- * corresponding PULSE-OUT-TTL shift-register channels. */
+ * Master drives data channels and reads INHIBIT. Slave reads data
+ * channels and drives INHIBIT. */
 class PulsePeripheral : public PulseWriter {
 public:
     enum class Mode : uint8_t { Master, Slave };
@@ -20,7 +20,7 @@ public:
      * is connector-local and 1-based; zero disables inhibit assignment. */
     bool setMode(Mode mode);
     Mode mode() const { return _mode; }
-    bool setInhibitChannel(uint8_t localChannel);
+    virtual bool setInhibitChannel(uint8_t localChannel);
     uint8_t inhibitChannel() const { return _inhibitChannel; }
 
     int pulseIndex(uint8_t localChannel) const;
@@ -35,6 +35,7 @@ protected:
     PulsePeripheral(Mode mode, uint8_t inhibitChannel);
     virtual uint8_t channelCount() const = 0;
     virtual int mapChannel(uint8_t localChannel) const = 0;
+    bool isInputChannel(uint8_t localChannel) const;
     bool validTarget(uint8_t localChannel) const override;
     void writeOut(uint8_t localChannel, uint8_t state) override;
 
@@ -71,11 +72,10 @@ inline bool PulsePeripheral::begin() {
     if ((_mode != Mode::Master && _mode != Mode::Slave) ||
         _inhibitChannel > channelCount() || !PulseWriter::begin()) return false;
 
-    const uint8_t pinMode = _mode == Mode::Master ? OUTPUT : INPUT;
     for (uint8_t channel = 1; channel <= channelCount(); ++channel) {
         const int index = mapChannel(channel);
         if (index < 0) { PulseWriter::end(); return false; }
-        IO::pinModePulse(index, pinMode);
+        IO::pinModePulse(index, isInputChannel(channel) ? INPUT : OUTPUT);
     }
     return true;
 }
@@ -94,18 +94,18 @@ inline void PulsePeripheral::end() {
 
 inline int PulsePeripheral::read(uint8_t localChannel) const {
     const int index = mapChannel(localChannel);
-    if (!_active || _mode != Mode::Slave || index < 0) return -1;
+    if (!_active || index < 0 || !isInputChannel(localChannel)) return -1;
     return IO::digitalReadPulse(index);
 }
 
 inline int PulsePeripheral::readInhibit() const {
-    return _inhibitChannel ? read(_inhibitChannel) : -1;
+    return _inhibitChannel && isInputChannel(_inhibitChannel) ? read(_inhibitChannel) : -1;
 }
 
 inline bool PulsePeripheral::setInterruptMode(uint8_t localChannel, uint8_t interruptMode,
                                                uint16_t debounceMs) {
     const int index = mapChannel(localChannel);
-    if (_active || _mode != Mode::Slave || index < 0) return false;
+    if (_active || index < 0 || !isInputChannel(localChannel)) return false;
     IO::pinModePulse(index, INPUT);
     PulseReader::setInterruptMode(index, interruptMode, debounceMs);
     return true;
@@ -113,8 +113,14 @@ inline bool PulsePeripheral::setInterruptMode(uint8_t localChannel, uint8_t inte
 
 inline bool PulsePeripheral::validTarget(uint8_t localChannel) const {
     const int index = mapChannel(localChannel);
-    return _active && _mode == Mode::Master && index >= 0 &&
+    return _active && index >= 0 && !isInputChannel(localChannel) &&
            Context::getInstance()->pulseConfiguration[index].pinMode == OUTPUT;
+}
+
+inline bool PulsePeripheral::isInputChannel(uint8_t localChannel) const {
+    if (mapChannel(localChannel) < 0) return false;
+    const bool isInhibit = localChannel == _inhibitChannel;
+    return isInhibit ? _mode == Mode::Master : _mode == Mode::Slave;
 }
 
 inline void PulsePeripheral::writeOut(uint8_t localChannel, uint8_t state) {

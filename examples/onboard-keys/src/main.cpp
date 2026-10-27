@@ -28,12 +28,13 @@ void setup() {
     VMCBuddy::EventHandler::subscribe(VMCBuddy::Event::PULSE_INT, onPulse);
 
     connector1.setInterruptMode(1, FALLING);
+    connector2.setInterruptMode(3, FALLING); // Master reads INHIBIT
     board.addPeripheral(&pulseReader);
     board.addPeripheral(&connector1);
     board.addPeripheral(&connector2);
     board.begin();
     connector2.sendPulses(1, 2, 100, 100); // local CH1 -> board output channel 4
-    connector2.setInhibit(true);            // local INHIBIT -> board output channel 6
+    connector1.setInhibit(true);            // Slave drives local INHIBIT
 }
 
 void loop() {

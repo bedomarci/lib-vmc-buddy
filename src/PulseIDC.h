@@ -12,11 +12,15 @@ class PulseIDC : public PulsePeripheral {
 public:
     using Mode = PulsePeripheral::Mode;
 
-    explicit PulseIDC(uint8_t connectorNumber, Mode mode = Mode::Slave,
-                      uint8_t inhibitChannel = 3);
+    explicit PulseIDC(uint8_t connectorNumber, Mode mode = Mode::Slave);
 
     const char* name() const override;
     int idcPin(uint8_t localChannel) const;
+    bool setInhibitChannel(uint8_t localChannel) override {
+        return localChannel == 0 || localChannel == 3
+            ? PulsePeripheral::setInhibitChannel(localChannel)
+            : false;
+    }
 
 protected:
     uint8_t channelCount() const override { return 3; }
@@ -26,8 +30,8 @@ private:
     uint8_t _connectorNumber;
 };
 
-inline PulseIDC::PulseIDC(uint8_t connectorNumber, Mode mode, uint8_t inhibitChannel)
-    : PulsePeripheral(mode, inhibitChannel), _connectorNumber(connectorNumber) {}
+inline PulseIDC::PulseIDC(uint8_t connectorNumber, Mode mode)
+    : PulsePeripheral(mode, 3), _connectorNumber(connectorNumber) {}
 
 inline const char* PulseIDC::name() const {
     return _connectorNumber == 1 ? "PulseIDC1" :
