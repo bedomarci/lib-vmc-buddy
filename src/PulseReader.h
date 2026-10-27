@@ -29,6 +29,7 @@ public:
     static bool registerInterrupts();
 
 protected:
+    static void IRAM_ATTR handleInterruptArg(void* arg);
     static void IRAM_ATTR handleInterrupts(uint8_t pulseIndex);
 };
 
@@ -50,47 +51,33 @@ inline void PulseReader::end() {
 }
 
 inline void PulseReader::setInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce) {
-    Context::getInstance()->pulseConfiguration[index].interruptMode = mode;
-    Context::getInstance()->pulseConfiguration[index].debounce = debounce;
+    if (index >= LEN_PIN_INTERRUPTS) return;
+    auto& pulse = Context::getInstance()->pulseConfiguration[index];
+    pulse.interruptMode = pulse.pinMode == INPUT ? mode : DETACH_ISR;
+    pulse.debounce = debounce;
 }
 
 inline bool PulseReader::registerInterrupts() {
-    if (Context::getInstance()->pulseConfiguration[0].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[0].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(0);},
-                       Context::getInstance()->pulseConfiguration[0].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[1].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[1].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(1);},
-                       Context::getInstance()->pulseConfiguration[1].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[2].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[2].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(2);},
-                       Context::getInstance()->pulseConfiguration[2].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[3].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[3].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(3);},
-                       Context::getInstance()->pulseConfiguration[3].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[4].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[4].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(4);},
-                       Context::getInstance()->pulseConfiguration[4].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[5].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[5].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(5);},
-                       Context::getInstance()->pulseConfiguration[5].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[6].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[6].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(6);},
-                       Context::getInstance()->pulseConfiguration[6].interruptMode);
-    if (Context::getInstance()->pulseConfiguration[7].interruptMode)
-        attachInterrupt(Context::getInstance()->pulseConfiguration[7].pin,
-                       []()IRAM_ATTR{PulseReader::handleInterrupts(7);},
-                       Context::getInstance()->pulseConfiguration[7].interruptMode);
+    auto* context = Context::getInstance();
     bool hasInterrupts = false;
-    for (const auto& p : Context::getInstance()->pulseConfiguration)
-        hasInterrupts |= (p.interruptMode != DETACH_ISR);
+    for (uint8_t i = 0; i < LEN_PIN_INTERRUPTS; ++i) {
+        auto& pulse = context->pulseConfiguration[i];
+        if (pulse.pinMode != INPUT || pulse.interruptMode == DETACH_ISR) {
+            detachInterrupt(pulse.pin);
+            continue;
+        }
+        attachInterruptArg(pulse.pin, PulseReader::handleInterruptArg,
+                           reinterpret_cast<void*>(static_cast<uintptr_t>(i + 1)),
+                           pulse.interruptMode);
+        hasInterrupts = true;
+    }
     return hasInterrupts;
+}
+
+inline void IRAM_ATTR PulseReader::handleInterruptArg(void* arg) {
+    const uintptr_t encodedIndex = reinterpret_cast<uintptr_t>(arg);
+    if (encodedIndex == 0 || encodedIndex > LEN_PIN_INTERRUPTS) return;
+    PulseReader::handleInterrupts(static_cast<uint8_t>(encodedIndex - 1));
 }
 
 inline void IRAM_ATTR PulseReader::handleInterrupts(const uint8_t pulseIndex) {

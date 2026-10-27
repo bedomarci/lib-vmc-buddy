@@ -27,8 +27,11 @@ void setup() {
     assert(terminal.inhibitChannel() == 8);
     VMCBuddy::EventHandler::subscribe(VMCBuddy::Event::PULSE_INT, onPulse);
 
-    connector1.setInterruptMode(1, FALLING);
-    connector2.setInterruptMode(3, FALLING); // Master reads INHIBIT
+    const bool slaveDataInput = connector1.setInterruptMode(1, FALLING);
+    const bool slaveInhibitOutput = !connector1.setInterruptMode(3, FALLING);
+    const bool masterInhibitInput = connector2.setInterruptMode(3, FALLING);
+    const bool masterDataOutput = !connector2.setInterruptMode(1, FALLING);
+    assert(slaveDataInput && slaveInhibitOutput && masterInhibitInput && masterDataOutput);
     board.addPeripheral(&pulseReader);
     board.addPeripheral(&connector1);
     board.addPeripheral(&connector2);
