@@ -50,16 +50,18 @@ Each input channel uses an optocoupler and has a corresponding MCU-side `PULSE-I
 
 The 10-pin `CON-PULSE-TERMINAL` maps pins 1–8 to external pulse channels 1–8, pin 9 to `VCC-IN`, and pin 10 to `GND`.
 
-The two 10-pin group connectors split channels by group: connector 1 carries channels 1–3, connector 2 carries channels 4–6, and channels 7–8 are on CON-RELAY. Each group also exposes its dedicated raw supply net:
+The two 2×5 IDC group connectors split pulse inputs by group; channels 7–8 are on CON-RELAY. Pins 8, 6, and 4 carry the three signals in each IDC group:
 
-| Pin | Pulse group 1 | Pulse group 2 |
+| IDC pin | Connector 1 net | Connector 2 net |
 |---:|---|---|
 | 1 | `GND` | `GND` |
 | 2 | `VCC-PULSE-1-RAW` | `VCC-PULSE-2-RAW` |
-| 4 | Channel 3 | Channel 6 |
-| 6 | Channel 2 | Channel 5 |
-| 8 | Channel 1 | Channel 4 |
-| Other pins | NC | NC |
+| 4 | `PULSE-EXT-CH3` | `PULSE-EXT-CH6` |
+| 6 | `PULSE-EXT-CH2` | `PULSE-EXT-CH5` |
+| 8 | `PULSE-EXT-CH1` | `PULSE-EXT-CH4` |
+| 3, 5, 7, 9, 10 | NC | NC |
+
+The [`PulseIDC` class](./sdk_api_reference.md#pulse-idc-connectors) maps local CH1, CH2, and INHIBIT roles to these nets for either connector and applies the selected Master/Slave direction mode. In Master mode its outputs use the separate `PULSE-OUT-TTL-CHx` shift-register paths; the schematic does not connect those outputs to the IDC pins.
 
 `CON-RELAY` is a four-pin connector: `VCC5V`, pulse channel 7, pulse channel 8, and `GND` on pins 1–4 respectively. The connector exposes these pulse nets; it does not add a separate relay driver.
 

@@ -8,6 +8,7 @@ This reference reflects the implementation currently present in `src/`, not ever
 |--------------------|---------------------|------------------|
 | Pulse inputs | 8 optocoupled channels | `setPulseInterruptMode()` and event bus |
 | Pulse outputs | 8 optocoupler-driven channels | `PulseWriter::sendPulses()` |
+| Pulse IDC connectors | Two connectors for input groups 1–3 and 4–6 | `PulseIDC` mapping adapter |
 | Onboard LEDs | 6 LEDs via 74HC595D | `Led::set()` and `Led::blink()` |
 | Analog buttons | 6-button resistor ladder | Internal polling; `EventHandler` events |
 | MDB | Isolated transceiver/optocouplers | `MDB` and `MDBPeripheral` classes |
@@ -79,6 +80,34 @@ bool blink(uint8_t ledIndex, uint16_t count, uint16_t onTimeMs,
 ```
 
 `blink()` reuses `PulseWriter`'s restartable phase task; it returns false for an invalid LED index or pulse parameters.
+
+## Pulse IDC connectors
+
+`PulseIDC` represents either 2×5 connector and exposes local roles CH1, CH2, and INHIBIT. Select connector 1 or 2 and Master or Slave mode at construction:
+
+```cpp
+VMCBuddy::PulseIDC idc1(1, VMCBuddy::PulseIDC::Mode::Slave);
+VMCBuddy::PulseIDC idc2(2, VMCBuddy::PulseIDC::Mode::Master);
+```
+
+| Connector | Local CH1 | Local CH2 | Local INHIBIT |
+|---|---|---|---|
+| 1 | Input: pin 8, `PULSE-EXT-CH1`; Master output: `PULSE-OUT-TTL-CH1` | Input: pin 6, `PULSE-EXT-CH2`; Master output: `PULSE-OUT-TTL-CH2` | Input: pin 4, `PULSE-EXT-CH3`; Master output: `PULSE-OUT-TTL-CH3` |
+| 2 | Input: pin 8, `PULSE-EXT-CH4`; Master output: `PULSE-OUT-TTL-CH4` | Input: pin 6, `PULSE-EXT-CH5`; Master output: `PULSE-OUT-TTL-CH5` | Input: pin 4, `PULSE-EXT-CH6`; Master output: `PULSE-OUT-TTL-CH6` |
+
+The connector's physical `PULSE-EXT` nets are optoisolated inputs. In Master mode, writes use the corresponding separate shift-register `PULSE-OUT-TTL` path; the schematic does not wire that output path back onto the IDC contact.
+
+| Method | Behavior |
+|---|---|
+| `setMode(Mode)` | Select `Master` (output) or `Slave` (input) before begin |
+| `read(localChannel)` | Read local CH1/CH2/INHIBIT in Slave mode; -1 otherwise |
+| `setInterruptMode(localChannel, mode, debounceMs)` | Configure the global `PulseReader` input before board begin |
+| `sendPulses(localChannel, count, pulseMs, pauseMs)` | Inherited `PulseWriter` method; valid for local CH1/CH2/INHIBIT in Master mode |
+| `setInhibit(active)` | Drive local INHIBIT in Master mode |
+| `readInhibit()` | Read local INHIBIT in Slave mode |
+| `pulseIndex(localChannel)` / `gpio(localChannel)` / `idcPin(localChannel)` | Resolve local role to board channel, GPIO, or IDC contact |
+
+The class maps connector 1 local roles to zero-based pulse indexes 0–2 and connector 2 roles to indexes 3–5. Register each `PulseIDC` plus one shared `PulseReader` with VMCBuddy.
 
 ### Declared, currently not implemented
 

@@ -96,6 +96,7 @@ lib-vmc-buddy/
 │   ├── SerialPeripheral.h              ← HardwareSerial/SoftwareSerial adapter
 │   ├── PulseReader.h                  ← ISR-based pulse input
 │   ├── PulseWriter.h                  ← Pulse output generator
+│   ├── PulseIDC.h                     ← IDC pulse-input connector mapping
 │   ├── Led.h                          ← Onboard LED controller
 │   ├── AnalogButtonReader.h           ← ADC button reader
 │   ├── MDB*.h / RS*.h                  ← Serial interface layers

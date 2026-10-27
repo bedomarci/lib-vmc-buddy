@@ -16,6 +16,7 @@ Expand the VMC Buddy SDK with one pin-config source, a scheduler-owned periphera
 - Add cashless, bill-validator, and coin-changer MDB use-case base classes.
 - Add the UART `CommandInterpreter` as a scheduler-managed peripheral.
 - Make `PulseReader`, `AnalogButtonReader`, `PulseWriter`, and `Led` schedulable peripherals.
+- Add a mode-aware `PulseIDC` adapter mapping local CH1/CH2/INHIBIT to board channel groups 1–3 or 4–6.
 - Keep pulse output and onboard LED controls separate; `Led::blink()` reuses the counted pulse task phases.
 - Document the APIs and verify board examples build.
 

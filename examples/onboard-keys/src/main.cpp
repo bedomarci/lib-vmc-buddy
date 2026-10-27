@@ -1,31 +1,37 @@
-// Program.ino
-// License is available in LICENSE.md
-// This program was created by <HUMAN>
-
-#include "Arduino.h"   // go to this file to import libraries
-#include "VMCBuddy.H"   // go to this file to import libraries
+#include <Arduino.h>
+#include <assert.h>
+#include <VMCBuddy.h>
 #include <TaskScheduler.h>
+#include <PulseReader.h>
+#include <PulseIDC.h>
+#include <EventHandler.h>
 
+Scheduler scheduler;
+VMCBuddy::VMCBuddy board(&scheduler);
+VMCBuddy::PulseReader pulseReader;
+VMCBuddy::PulseIDC connector1(1, VMCBuddy::PulseIDC::Mode::Slave);
+VMCBuddy::PulseIDC connector2(2, VMCBuddy::PulseIDC::Mode::Master);
 
-Scheduler *scheduler;
-VMCBuddy *board;
-void onChange(uint8_t event, int value);
-
+void onPulse(int channel, int value, int mode) {
+    Serial.printf("Pulse input %d: value=%d mode=%d\n", channel, value, mode);
+}
 
 void setup() {
     Serial.begin(115200);
-    scheduler = new Scheduler();
+    assert(connector1.pulseIndex(1) == 0 && connector1.pulseIndex(3) == 2);
+    assert(connector2.pulseIndex(1) == 3 && connector2.pulseIndex(3) == 5);
+    assert(connector2.gpio(1) == 33 && connector2.gpio(3) == 39);
+    VMCBuddy::EventHandler::subscribe(VMCBuddy::Event::PULSE_INT, onPulse);
 
-    board = new VMCBuddy(scheduler);
-    board->setOnChangeCallback(onChange);
-    board->begin();
-}
-
-void onChange(uint8_t event, int value){
-    Log.traceln("%d - %d", event, value);
+    connector1.setInterruptMode(1, FALLING);
+    board.addPeripheral(&pulseReader);
+    board.addPeripheral(&connector1);
+    board.addPeripheral(&connector2);
+    board.begin();
+    connector2.sendPulses(1, 2, 100, 100); // local CH1 -> board output channel 4
+    connector2.setInhibit(true);            // local INHIBIT -> board output channel 6
 }
 
 void loop() {
-    scheduler->execute();
+    scheduler.execute();
 }
-
