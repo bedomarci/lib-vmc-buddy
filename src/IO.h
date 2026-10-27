@@ -2,69 +2,61 @@
 #define IO_H
 
 #include <Context.h>
+#include <ArduinoLog.h>
 
-namespace VMCBuddy
-{
-    class IO
-    {
-    public:
-        static void digitalWritePulse(uint8_t index, uint8_t state);
-        static void pinModePulse(uint8_t index, uint8_t mode);
-        static void setShiftRegisterBit(uint8_t index, uint8_t value);
-        static void setLed(uint8_t index, uint8_t value);
-        static void render();
-    private:
-    };
+namespace VMCBuddy {
 
-    inline void IO::pinModePulse(uint8_t index, uint8_t mode)
-    {
-        // index = constrain(index, 1, NUM_PULSE) - 1;
-        Context::getInstance()->pulseConfiguration[index].pinMode = mode;
+/** GPIO and shift-register I/O for pulse channels. Onboard LED behavior
+ * belongs to Led, not this low-level pulse I/O helper. */
+class IO {
+public:
+    static void digitalWritePulse(uint8_t index, uint8_t state);
+    static int digitalReadPulse(uint8_t index);
+    static void pinModePulse(uint8_t index, uint8_t mode);
+    static void setShiftRegisterBit(uint8_t index, uint8_t value);
+    static void render();
+};
 
-        if (mode == INPUT)
-        {
-            IO::setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], 0);
-        }
+inline void IO::pinModePulse(uint8_t index, uint8_t mode) {
+    if (index >= NUM_PULSE) return;
+    Context::getInstance()->pulseConfiguration[index].pinMode = mode;
+    if (mode == INPUT)
+        setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], LOW);
+}
+
+inline void IO::digitalWritePulse(uint8_t index, uint8_t state) {
+    if (index >= NUM_PULSE) return;
+    if (Context::getInstance()->pulseConfiguration[index].pinMode != OUTPUT) {
+        Log.errorln("Pulse #%i is INPUT — cannot digitalWrite.", index + 1);
+        return;
     }
+    setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], state ? HIGH : LOW);
+}
 
-    inline void IO::digitalWritePulse(uint8_t index, uint8_t state)
-    {
-        // index = constrain(index, 1, NUM_PULSE) - 1;
-        if (Context::getInstance()->pulseConfiguration[index].pinMode == INPUT)
-        {
-            Log.errorln("Pin #%i is in INPUT mode. You can not write out!", index + 1);
-            return;
-        }
-        setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], state);
+inline int IO::digitalReadPulse(uint8_t index) {
+    if (index >= NUM_PULSE) return LOW;
+    if (Context::getInstance()->pulseConfiguration[index].pinMode != INPUT) {
+        Log.errorln("Pulse #%i is OUTPUT — cannot digitalRead.", index + 1);
+        return LOW;
     }
+    return digitalRead(Context::getInstance()->pulseInPins[index]);
+}
 
-    inline void IO::setShiftRegisterBit(uint8_t index, uint8_t value)
-    {
-        Context::getInstance()->shiftRegisterBits[index] = value;
-        render();
+inline void IO::setShiftRegisterBit(uint8_t index, uint8_t value) {
+    if (index >= LEN_SHIFT_REGISTER_BITS) return;
+    Context::getInstance()->shiftRegisterBits[index] = value ? HIGH : LOW;
+    render();
+}
+
+inline void IO::render() {
+    digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
+    for (unsigned char bit : Context::getInstance()->shiftRegisterBits) {
+        digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, bit ? HIGH : LOW);
+        digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
+        digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
     }
+    digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
+}
 
-    inline void IO::setLed(uint8_t index, uint8_t value)
-    {
-        // index = constrain(index, 1, NUM_LEDS) - 1;
-        setShiftRegisterBit(Context::getInstance()->ledPins[index], !value);
-    }
-
-    inline void IO::render()
-    {
-        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
-        // Loop through the 16 bits
-        for (unsigned char shiftRegisterBit : Context::getInstance()->shiftRegisterBits)
-        {
-            // Write the bit to the data pin
-            digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, shiftRegisterBit ? HIGH : LOW);
-            // Pulse the clock to shift the bit
-            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
-            digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
-        }
-        // End transmission: Pull latch high
-        digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
-    }
-} // VMCBuddy
-
-#endif //IO_H
+} // namespace VMCBuddy
+#endif // IO_H

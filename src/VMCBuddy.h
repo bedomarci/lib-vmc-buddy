@@ -2,55 +2,43 @@
 #define VMC_BUDDY_H
 
 #define _TASK_STD_FUNCTION
+#define _TASK_INLINE
 
 #include <Arduino.h>
 #include <TaskSchedulerDeclarations.h>
 #include <ArduinoLog.h>
 #include <macros.h>
 #include <Context.h>
+#include <IPeripheral.h>
+#include <vector>
 
-namespace VMCBuddy
-{
-    class AnalogButtonReader;
-    class PulseReader;
-    class VMCBuddy
-    {
-        // friend class AnalogButtonReader;
-    public:
-        // Constructor accepting a pointer to the TaskScheduler
-        VMCBuddy(Scheduler* scheduler, Print* serial = nullptr);
+namespace VMCBuddy {
 
-        // void setLed(uint8_t index, uint8_t value);
-        void digitalWritePulsePin(uint8_t index, uint8_t value);
-        void pinModePulse(uint8_t index, uint8_t mode);
-        void setOnEventCallback(std::function<void(uint8_t, int)> callback);
-        void blink(uint8_t ledIndex, int numberOfBlinks, int onTime, int offTime, int delay = 0);
-        void sendPulse(uint8_t pulseIndex, int numberOfPulse, int onTime, int offTime);
+class VMCBuddy {
+public:
+    explicit VMCBuddy(Scheduler* scheduler, Print* serial = nullptr);
 
-        // void blinkLed();
+    /** Register a peripheral. It will be added to the scheduler and
+        begin()-ed when VMCBuddy::begin() is called. */
+    void addPeripheral(IPeripheral* p);
 
-        // Initialize the library
-        void setPulseInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce = DEFAULT_PULSE_DEBOUNCE);
-        void begin();
+    /** Call once after registering peripherals. Starts each peripheral. */
+    void begin();
 
+    // — pulse I/O configuration —
+    void digitalWritePulsePin(uint8_t index, uint8_t value);
+    void pinModePulse(uint8_t index, uint8_t mode);
+    void setPulseInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce = DEFAULT_PULSE_DEBOUNCE);
 
-    private:
-        ::Scheduler* scheduler;
-        ::Print* serial;
-        // uint8_t shiftRegisterBits[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        //uint8_t pulsePinMode[NUM_PULSE] = {0, 0, 0, 0, 0, 0, 0, 0};
-        // std::map<uint8_t,uint8_t> inputValues;
-        bool initialized = false;
+    void setOnEventCallback(std::function<void(uint8_t, int)> callback);
+    Scheduler* scheduler() { return _scheduler; }
 
-        AnalogButtonReader* analogButtonReader = nullptr;
-        PulseReader* pulseReader = nullptr;
+private:
+    Scheduler* _scheduler;
+    Print* _serial;
+    bool _initialized = false;
+    std::vector<IPeripheral*> _peripherals;
+};
 
-        Context * context();
-
-
-
-    };
-
-}
-
+} // namespace VMCBuddy
 #endif // VMC_BUDDY_H
