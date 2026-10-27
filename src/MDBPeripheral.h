@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <functional>
-#include <TaskScheduler.h>
 #include "MDB.h"
 
 namespace VMCBuddy {
@@ -19,7 +18,7 @@ namespace VMCBuddy {
  * runtime configuration over RS-232 or MDB.
  *
  * Usage:
- *   MDBPeripheral periph(0x10, &scheduler);
+ *   MDBPeripheral periph(0x10);
  *   periph.onPoll([](){ return 0x01; });
  *   periph.onVend([](const MDB::Packet& p){ ... });
  *   board.addPeripheral(&periph);
@@ -27,7 +26,6 @@ namespace VMCBuddy {
 class MDBPeripheral : public MDB {
 public:
     explicit MDBPeripheral(uint8_t address,
-                           Scheduler* scheduler = nullptr,
                            Print* logOut = nullptr);
 
     bool begin() override;  // starts bus + enables task
@@ -47,7 +45,6 @@ public:
     void onExpansion(ExpansionHandler h) { _onExpansion = h; }
 
 private:
-    Scheduler* _scheduler;
     Print* _serial;
     bool _enabled   = false;
     bool _justReset = true;
@@ -62,12 +59,11 @@ private:
     void dispatch(const Packet& packet);
 };
 
-inline MDBPeripheral::MDBPeripheral(uint8_t address, Scheduler* scheduler, Print* logOut)
-    : MDB(address), _scheduler(scheduler), _serial(logOut) {
+inline MDBPeripheral::MDBPeripheral(uint8_t address, Print* logOut)
+    : MDB(address), _serial(logOut) {
     setInterval(1);
     setIterations(TASK_FOREVER);
     setCallback([this](){ if(_enabled) tick(); });
-    if (scheduler) scheduler->addTask(*this);
 }
 
 inline bool MDBPeripheral::begin() {

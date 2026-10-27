@@ -30,7 +30,7 @@ class CommandInterpreter : public IPeripheral {
 public:
     using CmdHandler = std::function<void(const char* args)>;
 
-    explicit CommandInterpreter(Stream* stream, Scheduler* scheduler = nullptr);
+    explicit CommandInterpreter(Stream* stream);
 
     bool begin() override;
     void end() override;
@@ -48,12 +48,11 @@ private:
     void dispatch(const String& line);
 };
 
-inline CommandInterpreter::CommandInterpreter(Stream* stream, Scheduler* scheduler)
+inline CommandInterpreter::CommandInterpreter(Stream* stream)
     : IPeripheral(), _stream(stream) {
     setInterval(10);
     setIterations(TASK_FOREVER);
     setCallback([this](){ if(_active) tick(); });
-    if (scheduler) scheduler->addTask(*this);
 }
 
 inline bool CommandInterpreter::begin() { Task::enable(); _active = true; return true; }
