@@ -93,6 +93,7 @@ lib-vmc-buddy/
 │   ├── EventHandler.h                 ← Event bus (subscribe/trigger)
 │   ├── IO.h                           ← Pulse GPIO and shift-register I/O
 │   ├── IPeripheral.h / ISerial.h       ← Scheduler and serial interfaces
+│   ├── SerialPeripheral.h              ← HardwareSerial/SoftwareSerial adapter
 │   ├── PulseReader.h                  ← ISR-based pulse input
 │   ├── PulseWriter.h                  ← Pulse output generator
 │   ├── Led.h                          ← Onboard LED controller

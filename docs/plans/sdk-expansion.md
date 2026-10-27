@@ -10,7 +10,8 @@ Expand the VMC Buddy SDK with one pin-config source, a scheduler-owned periphera
 ## Implementation
 - Keep pin literals in `src/macros.h` and expose a structured `BoardConfig` view from those definitions.
 - Add `IPeripheral` and `ISerial`; register peripheral Tasks through `VMCBuddy::addPeripheral()`.
-- Implement `RS232` and `RS485` HardwareSerial wrappers with UART route ownership checks.
+- Add `SerialPeripheral` with `setSerial(Stream*)`, default HardwareSerial selection, and injected-stream ownership rules.
+- Implement `RS232` and `RS485` wrappers with UART route ownership checks.
 - Implement MDB/ICP 9-bit bit-bang on GPIO16/17, packet framing, and MDB peripheral callbacks.
 - Add cashless, bill-validator, and coin-changer MDB use-case base classes.
 - Add the UART `CommandInterpreter` as a scheduler-managed peripheral.

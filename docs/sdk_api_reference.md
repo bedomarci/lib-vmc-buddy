@@ -198,18 +198,31 @@ The six button thresholds are 3150, 2880, 2560, 1820, 1120, and 820 ADC units in
 
 ## New interface classes
 
+### `VMCBuddy::SerialPeripheral`
+
+Shared serial implementation base between `ISerial` and the RS-232/RS-485 concrete classes.
+
+| Method | Signature | Notes |
+|---|---|---|
+| `setSerial` | `void setSerial(Stream* serial)` | Inject `HardwareSerial`, `SoftwareSerial`, or another Arduino `Stream` |
+| `stream` | `Stream* stream()` | Returns the active/injected stream |
+| `begin` | `bool begin()` | If no stream was injected, selects and starts the board's default HardwareSerial |
+| `end` | `void end()` | Stops only the HardwareSerial instance opened by the default path |
+
+Injected streams are caller-owned and must be configured before `begin()`. Call `setSerial(nullptr)` to return to the board's default hardware serial. MDB stays on its GPIO bit-bang transport because Arduino `Stream` cannot carry MDB's 9th bit.
+
 ### `VMCBuddy::RS232`
 
 | Method | Signature | Notes |
 |---|---|---|
 | Constructor | `RS232(uint8_t channel)` | Channel 1 uses UART1; channel 2 uses UART2 |
-| `begin` | `begin(unsigned long baud=9600, uint32_t config=SERIAL_8N1)` | Configures HardwareSerial |
+| `begin` | `begin()` / `begin(unsigned long baud, uint32_t config=SERIAL_8N1)` | Injected Stream is already configured; default path starts HardwareSerial |
 | `end` | `end()` | Releases the UART |
 | `write` | `write(uint8_t c)` / `write(const uint8_t*, size_t)` | Blocking write |
 | `read` | `int read()` | Returns next byte or -1 |
 | `available` | `int available()` | Bytes in RX buffer |
 | `flush` | `flush()` | Wait for TX completion |
-| `stream` | `HardwareSerial* stream()` | Direct access to underlying HardwareSerial |
+| `setSerial` | `setSerial(Stream*)` | Inherited from `SerialPeripheral`; supports SoftwareSerial |
 
 Channel 2 shares UART2 with RS-485 and MDB; the 2×15 through-hole jumper field selects the routing.
 
@@ -218,12 +231,12 @@ Channel 2 shares UART2 with RS-485 and MDB; the 2×15 through-hole jumper field 
 | Method | Signature | Notes |
 |---|---|---|
 | Constructor | `RS485()` | Uses UART2, direction control on GPIO 15 |
-| `begin` | `begin(unsigned long baud=9600, uint32_t config=SERIAL_8N1)` | Acquires UART2 bus; returns without configuring if conflict |
+| `begin` | `begin()` / `begin(unsigned long baud, uint32_t config=SERIAL_8N1)` | Acquires UART2 route; false on conflict |
 | `end` | `end()` | Releases UART2 bus |
 | `write` | `write(uint8_t c)` / `write(const uint8_t*, size_t)` | Auto DE/RE toggling: HIGH → write → flush → LOW |
 | `read` | `int read()` | Returns next byte or -1 |
 | `available` | `int available()` | Bytes in RX buffer |
-| `stream` | `HardwareSerial* stream()` | Direct access to underlying HardwareSerial |
+| `setSerial` | `setSerial(Stream*)` | Inherited from `SerialPeripheral`; supports SoftwareSerial |
 
 ### `VMCBuddy::MDB` (L1–L2)
 
