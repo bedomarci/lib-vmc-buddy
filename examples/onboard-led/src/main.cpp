@@ -21,7 +21,6 @@ void setup() {
     assert(!relays.set(0, true));
     assert(!relays.set(3, true));
 
-    // LED index is zero-based: 0..5. Blink 5 times, 300 ms on/off.
     leds.blink(0, 5, 300, 300);
 }
 

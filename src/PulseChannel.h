@@ -1,150 +1,186 @@
 #ifndef PULSE_CHANNEL_H
 #define PULSE_CHANNEL_H
 
-#include <Context.h>
-#include <EventHandler.h>
+#include <IPeripheral.h>
 #include <IO.h>
+#include <EventHandler.h>
 
 namespace VMCBuddy {
 
-class PulseChannel {
+class PulseChannel : public IPeripheral {
 public:
-    explicit PulseChannel(uint8_t index, Context* ctx)
-        : _ctx(ctx)
-        , _state(&ctx->pulseConfiguration[index])
-        , _index(index) {}
+    PulseChannel(const char* name, uint8_t boardIndex);
 
-    // ---- input mode ----
+    void configure(uint8_t gpio, uint8_t srBit, uint8_t pinMode,
+                   uint8_t interruptMode, uint16_t debounce);
+
+    void boot(Context* ctx) override;
+    bool begin() override;
+    void end() override;
+    const char* name() const override { return _name; }
+
+    bool isOutput() const { return _pinMode == OUTPUT; }
+    uint8_t pinMode() const { return _pinMode; }
+    uint8_t boardIndex() const { return _boardIndex; }
+
     int read() const;
-    bool setInterruptMode(uint8_t mode, uint16_t debounce = DEFAULT_PULSE_DEBOUNCE);
-    void attachInterrupt();
-    void disableInterrupt();
-    void checkDirty();
-
-    // ---- output mode ----
     void write(uint8_t val);
     bool startPulseTrain(uint16_t count, uint16_t pulseLengthMs,
                          uint16_t pauseLengthMs, uint16_t startDelayMs = 0);
-    void updateWriter();
-    bool writerBusy() const { return _phase != Phase::Idle; }
-    uint16_t writerDelayMs() const;
-    void stopWriter();
 
-    // ---- common ----
-    bool isValid() const { return _index < _ctx->boardConfig.numPulses; }
-    uint8_t index() const { return _index; }
-    uint8_t pinMode() const { return _state->pinMode; }
-    void setPinMode(uint8_t mode) { IO::pinModePulse(_index, mode); }
-    bool isInput() const { return _state->pinMode == INPUT; }
-    const void* owner() const { return _state->owner; }
-    void setOwner(const void* o) { _state->owner = o; }
+protected:
+    void tick();
 
-private:
+    const char* _name;
+    uint8_t _boardIndex;
+
+    uint8_t _gpio = 0;
+    uint8_t _srBit = 0;
+    uint8_t _interruptMode = DETACH_ISR;
+    uint8_t _pinMode = INPUT;
+    uint8_t _value = LOW;
+    bool _isDirty = false;
+    unsigned long _lastInterrupt = 0;
+    uint16_t _debounce = DEFAULT_PULSE_DEBOUNCE;
+
     enum class Phase : uint8_t { Idle, Start, Pulse, Pause };
-
-    Context* _ctx;
-    _PulseChannel* _state;
-    uint8_t _index;
-
     Phase _phase = Phase::Idle;
     uint16_t _remaining = 0;
     uint16_t _pulseLengthMs = 0;
     uint16_t _pauseLengthMs = 0;
     uint32_t _nextTransition = 0;
 
+    bool _configured = false;
+
     static void IRAM_ATTR handleInterruptArg(void* arg);
     static void IRAM_ATTR handleInterrupts(uint8_t pulseIndex);
 };
 
-inline int PulseChannel::read() const {
-    if (!isValid() || _state->pinMode != INPUT ||
-        _state->owner == nullptr) return -1;
-    return IO::digitalReadPulse(_index);
+inline PulseChannel::PulseChannel(const char* name, uint8_t boardIndex)
+    : _name(name), _boardIndex(boardIndex) {
+    setInterval(1);
+    setIterations(TASK_FOREVER);
+    setCallback([this]() { tick(); });
+    Task::disable();
 }
 
-inline bool PulseChannel::setInterruptMode(uint8_t mode, uint16_t debounce) {
-    if (!isValid() || _state->pinMode != INPUT) return false;
-    if (mode != DETACH_ISR && mode != CHANGE && mode != RISING && mode != FALLING)
-        return false;
-    _state->interruptMode = mode;
-    _state->debounce = debounce;
+inline void PulseChannel::configure(uint8_t gpio, uint8_t srBit, uint8_t pinMode,
+                                     uint8_t interruptMode, uint16_t debounce) {
+    if (_active || _configured) return;
+    _gpio = gpio;
+    _srBit = srBit;
+    _pinMode = pinMode;
+    _interruptMode = interruptMode;
+    _debounce = debounce;
+    _configured = true;
+    auto* ctx = Context::getInstance();
+    if (_boardIndex < ctx->boardConfig.numPulses)
+        ctx->pulseChannels[_boardIndex] = this;
+}
+
+inline void PulseChannel::boot(Context* ctx) {
+    ctx->board()->addPeripheral(this);
+}
+
+inline bool PulseChannel::begin() {
+    if (_active) return true;
+    if (!_configured) return false;
+
+    ::pinMode(_gpio, _pinMode);
+    if (_pinMode == INPUT) {
+        _isDirty = false;
+        if (_interruptMode != DETACH_ISR) {
+            attachInterruptArg(_gpio, handleInterruptArg,
+                               reinterpret_cast<void*>(static_cast<uintptr_t>(_boardIndex + 1)),
+                               _interruptMode);
+            Task::enable();
+        }
+    } else {
+        detachInterrupt(_gpio);
+        IO::setShiftRegisterBit(_srBit, LOW);
+        _value = LOW;
+    }
+    _active = true;
     return true;
 }
 
-inline void PulseChannel::attachInterrupt() {
-    if (!isValid() || _state->pinMode != INPUT ||
-        _state->interruptMode == DETACH_ISR) return;
-    _state->isDirty = false;
-    attachInterruptArg(_ctx->boardConfig.pulseInGpio[_index],
-                       PulseChannel::handleInterruptArg,
-                       reinterpret_cast<void*>(static_cast<uintptr_t>(_index + 1)),
-                       _state->interruptMode);
-}
-
-inline void PulseChannel::disableInterrupt() {
-    if (isValid())
-        detachInterrupt(_ctx->boardConfig.pulseInGpio[_index]);
-}
-
-inline void PulseChannel::checkDirty() {
-    if (!isValid() || !_state->isDirty || _state->pinMode != INPUT) return;
-    EventHandler::trigger(Event::PULSE_INT, _state->index, _state->value, _state->interruptMode);
-    _state->isDirty = false;
-}
-
-inline void IRAM_ATTR PulseChannel::handleInterruptArg(void* arg) {
-    const uintptr_t encodedIndex = reinterpret_cast<uintptr_t>(arg);
+inline void PulseChannel::end() {
+    if (!_active) return;
+    Task::disable();
+    if (_phase == Phase::Pulse) write(LOW);
+    if (_pinMode == INPUT) detachInterrupt(_gpio);
+    _phase = Phase::Idle;
+    _remaining = 0;
+    _isDirty = false;
     auto* ctx = Context::getInstance();
-    if (encodedIndex == 0 || encodedIndex > ctx->boardConfig.numPulses) return;
-    handleInterrupts(static_cast<uint8_t>(encodedIndex - 1));
+    if (_boardIndex < ctx->boardConfig.numPulses)
+        ctx->pulseChannels[_boardIndex] = nullptr;
+    _active = false;
+    _configured = false;
 }
 
-inline void IRAM_ATTR PulseChannel::handleInterrupts(const uint8_t pulseIndex) {
-    auto* ctx = Context::getInstance();
-    auto& pulse = ctx->pulseConfiguration[pulseIndex];
-    if (pulse.pinMode != INPUT) return;
-    const unsigned long now = millis();
-    if (now - pulse.lastInterrupt > pulse.debounce) {
-        pulse.value = digitalRead(ctx->boardConfig.pulseInGpio[pulseIndex]);
-        pulse.isDirty = true;
-        pulse.lastInterrupt = now;
-    }
+inline int PulseChannel::read() const {
+    if (!_active || _pinMode != INPUT) return -1;
+    return digitalRead(_gpio);
 }
 
 inline void PulseChannel::write(uint8_t val) {
-    IO::digitalWritePulse(_index, val);
+    if (!_active || _pinMode != OUTPUT) return;
+    IO::setShiftRegisterBit(_srBit, val ? HIGH : LOW);
+    _value = val;
 }
 
 inline bool PulseChannel::startPulseTrain(uint16_t count, uint16_t pulseLengthMs,
                                           uint16_t pauseLengthMs, uint16_t startDelayMs) {
-    if (!isValid() || _state->pinMode != OUTPUT || count == 0 || pulseLengthMs == 0)
+    if (!_active || _pinMode != OUTPUT || count == 0 || pulseLengthMs == 0)
         return false;
-    if (_phase == Phase::Pulse) IO::digitalWritePulse(_index, LOW);
+    if (_phase == Phase::Pulse) write(LOW);
     _remaining = count;
     _pulseLengthMs = pulseLengthMs;
     _pauseLengthMs = pauseLengthMs;
     _phase = Phase::Start;
     _nextTransition = millis() + startDelayMs;
+    EventHandler::trigger(Event::CHANNEL_START, _boardIndex, count);
+    Task::enable();
     return true;
 }
 
-inline void PulseChannel::updateWriter() {
+inline void PulseChannel::tick() {
+    if (!_active) return;
+
+    if (_pinMode == INPUT) {
+        if (_isDirty) {
+            EventHandler::trigger(Event::PULSE_INT, _boardIndex, _value, _interruptMode);
+            _isDirty = false;
+        }
+        return;
+    }
+
     if (_phase == Phase::Idle ||
         static_cast<int32_t>(millis() - _nextTransition) < 0) return;
+
     const uint32_t now = millis();
     switch (_phase) {
     case Phase::Start:
     case Phase::Pause:
-        IO::digitalWritePulse(_index, HIGH);
+        write(HIGH);
         _phase = Phase::Pulse;
         _nextTransition = now + _pulseLengthMs;
+        EventHandler::trigger(Event::CHANNEL_TICK, _boardIndex, HIGH);
+        setInterval(_pulseLengthMs);
         break;
     case Phase::Pulse:
-        IO::digitalWritePulse(_index, LOW);
-        if (--_remaining == 0) _phase = Phase::Idle;
-        else {
+        write(LOW);
+        if (--_remaining == 0) {
+            _phase = Phase::Idle;
+            EventHandler::trigger(Event::CHANNEL_TICK, _boardIndex, LOW);
+            EventHandler::trigger(Event::CHANNEL_STOP, _boardIndex);
+            Task::disable();
+        } else {
             _phase = Phase::Pause;
             _nextTransition = now + _pauseLengthMs;
+            EventHandler::trigger(Event::CHANNEL_TICK, _boardIndex, LOW);
+            setInterval(_pauseLengthMs);
         }
         break;
     case Phase::Idle:
@@ -152,16 +188,23 @@ inline void PulseChannel::updateWriter() {
     }
 }
 
-inline uint16_t PulseChannel::writerDelayMs() const {
-    if (_phase == Phase::Idle) return 1;
-    const int32_t remaining = static_cast<int32_t>(_nextTransition - millis());
-    return remaining > 0 ? static_cast<uint16_t>(remaining) : 1;
+inline void IRAM_ATTR PulseChannel::handleInterruptArg(void* arg) {
+    const uintptr_t idx = reinterpret_cast<uintptr_t>(arg);
+    if (idx == 0 || idx > Context::getInstance()->boardConfig.numPulses) return;
+    handleInterrupts(static_cast<uint8_t>(idx - 1));
 }
 
-inline void PulseChannel::stopWriter() {
-    if (_phase == Phase::Pulse) IO::digitalWritePulse(_index, LOW);
-    _phase = Phase::Idle;
-    _remaining = 0;
+inline void IRAM_ATTR PulseChannel::handleInterrupts(const uint8_t pulseIndex) {
+    auto* ctx = Context::getInstance();
+    if (pulseIndex >= ctx->boardConfig.numPulses) return;
+    auto* ch = ctx->pulseChannels[pulseIndex];
+    if (!ch || ch->_pinMode != INPUT) return;
+    const unsigned long now = millis();
+    if (now - ch->_lastInterrupt > ch->_debounce) {
+        ch->_value = digitalRead(ctx->boardConfig.pulseInGpio[pulseIndex]);
+        ch->_isDirty = true;
+        ch->_lastInterrupt = now;
+    }
 }
 
 } // namespace VMCBuddy

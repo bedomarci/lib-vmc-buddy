@@ -10,6 +10,7 @@ class PulsePeripheral : public IPeripheral {
 public:
     enum class Mode : uint8_t { Master, Slave };
 
+    void boot(Context* ctx) override;
     bool begin() override;
     void end() override;
 
@@ -35,19 +36,15 @@ protected:
     bool isInputChannel(uint8_t localChannel) const;
     PulseChannel* channel(uint8_t localChannel);
 
-private:
-    void tick();
-    bool _readerPolling = false;
+protected:
     Mode _mode;
     uint8_t _inhibitChannel;
-    PulseChannel* _channels[8] = {}; // ponytail: max 8 pulse channels on board
+    PulseChannel* _channels[8] = {};
 };
 
 inline PulsePeripheral::PulsePeripheral(Mode mode, uint8_t inhibitChannel)
     : _mode(mode), _inhibitChannel(inhibitChannel) {
-    setInterval(1);
-    setIterations(TASK_FOREVER);
-    setCallback([this]() { tick(); });
+    Task::disable();
 }
 
 inline bool PulsePeripheral::setMode(Mode mode) {
@@ -70,8 +67,24 @@ inline int PulsePeripheral::gpio(uint8_t localChannel) const {
 
 inline PulseChannel* PulsePeripheral::channel(uint8_t localChannel) {
     const int idx = mapChannel(localChannel);
-    if (idx < 0) return nullptr;
+    if (idx < 0 || idx >= Context::getInstance()->boardConfig.numPulses) return nullptr;
     return _channels[static_cast<uint8_t>(idx)];
+}
+
+inline void PulsePeripheral::boot(Context* ctx) {
+    auto* c = Context::getInstance();
+    for (uint8_t ch = 1; ch <= channelCount(); ++ch) {
+        const int idx = mapChannel(ch);
+        if (idx < 0 || idx >= c->boardConfig.numPulses) continue;
+        auto* pulse = _channels[static_cast<uint8_t>(idx)];
+        if (!pulse) {
+            char nameBuf[16];
+            snprintf(nameBuf, sizeof(nameBuf), "%s_CH%u", name(), ch);
+            pulse = new PulseChannel(nameBuf, static_cast<uint8_t>(idx));
+            _channels[static_cast<uint8_t>(idx)] = pulse;
+        }
+        pulse->boot(ctx);
+    }
 }
 
 inline bool PulsePeripheral::begin() {
@@ -79,73 +92,47 @@ inline bool PulsePeripheral::begin() {
     if ((_mode != Mode::Master && _mode != Mode::Slave) ||
         _inhibitChannel > channelCount()) return false;
 
-    auto* ctx = Context::getInstance();
+    const auto& cfg = Context::getInstance()->boardConfig;
     for (uint8_t c = 1; c <= channelCount(); ++c) {
         const int idx = mapChannel(c);
-        if (idx < 0 || idx >= ctx->boardConfig.numPulses ||
-            ctx->pulseConfiguration[idx].owner) return false;
-        for (uint8_t prior = 1; prior < c; ++prior)
-            if (mapChannel(prior) == idx) return false;
+        if (idx < 0 || idx >= cfg.numPulses) return false;
+        auto* pulse = _channels[static_cast<uint8_t>(idx)];
+        if (!pulse) return false;
     }
 
-    _readerPolling = false;
     for (uint8_t c = 1; c <= channelCount(); ++c) {
-        const uint8_t idx = static_cast<uint8_t>(mapChannel(c));
-        _channels[idx] = new PulseChannel(idx, ctx); // ponytail: heap, ~small footprint
-        auto& ch = *_channels[idx];
-        auto& pulse = ctx->pulseConfiguration[idx];
-        ch.setOwner(this);
-        pulse.isDirty = false;
-        const bool input = isInputChannel(c);
-        ch.setPinMode(input ? INPUT : OUTPUT);
-        if (input) {
-            if (pulse.interruptMode != DETACH_ISR) {
-                ch.attachInterrupt();
-                _readerPolling = true;
-            } else {
-                ch.disableInterrupt();
-            }
-        } else {
-            ch.disableInterrupt();
-            pulse.interruptMode = DETACH_ISR;
-            ch.write(LOW);
-        }
+        const int idx = mapChannel(c);
+        auto* pulse = _channels[static_cast<uint8_t>(idx)];
+        const bool isInput = isInputChannel(c);
+        const uint8_t pinMode = isInput ? INPUT : OUTPUT;
+        const uint8_t interruptMode = isInput ? DETACH_ISR : DETACH_ISR;
+        pulse->configure(cfg.pulseInGpio[static_cast<uint8_t>(idx)],
+                         cfg.pulseOutSrBit[static_cast<uint8_t>(idx)],
+                         pinMode, interruptMode, cfg.defaultPulseDebounce);
     }
 
     _active = true;
-    if (_readerPolling) Task::enable();
     return true;
 }
 
 inline void PulsePeripheral::end() {
     if (!_active) return;
-    Task::disable();
-
-    auto* ctx = Context::getInstance();
-    for (uint8_t c = 1; c <= channelCount(); ++c) {
-        const uint8_t idx = static_cast<uint8_t>(mapChannel(c));
-        auto* ch = _channels[idx];
-        if (ch && ctx->pulseConfiguration[idx].owner == this) {
-            ch->disableInterrupt();
-            ch->setPinMode(INPUT);
-            ch->setInterruptMode(DETACH_ISR);
-            ch->stopWriter();
-            ctx->pulseConfiguration[idx].isDirty = false;
-            ctx->pulseConfiguration[idx].owner = nullptr;
+    for (auto* ch : _channels) {
+        if (ch) {
+            ch->end();
             delete ch;
-            _channels[idx] = nullptr;
         }
     }
-    _readerPolling = false;
+    memset(_channels, 0, sizeof(_channels));
     _active = false;
 }
 
 inline int PulsePeripheral::read(uint8_t localChannel) const {
     const int idx = mapChannel(localChannel);
     if (!_active || idx < 0 || idx >= Context::getInstance()->boardConfig.numPulses ||
-        !isInputChannel(localChannel) ||
-        Context::getInstance()->pulseConfiguration[idx].owner != this) return -1;
-    return IO::digitalReadPulse(static_cast<uint8_t>(idx));
+        !isInputChannel(localChannel)) return -1;
+    auto* ch = _channels[static_cast<uint8_t>(idx)];
+    return ch ? ch->read() : -1;
 }
 
 inline int PulsePeripheral::readInhibit() const {
@@ -157,12 +144,13 @@ inline bool PulsePeripheral::setInterruptMode(uint8_t localChannel, uint8_t inte
     const int idx = mapChannel(localChannel);
     const auto& cfg = Context::getInstance()->boardConfig;
     if (_active || idx < 0 || idx >= cfg.numPulses ||
-        Context::getInstance()->pulseConfiguration[idx].owner ||
         !isInputChannel(localChannel)) return false;
     auto* ch = _channels[static_cast<uint8_t>(idx)];
     if (!ch) return false;
-    ch->setPinMode(INPUT);
-    return ch->setInterruptMode(interruptMode, debounceMs);
+    ch->configure(cfg.pulseInGpio[static_cast<uint8_t>(idx)],
+                  cfg.pulseOutSrBit[static_cast<uint8_t>(idx)],
+                  INPUT, interruptMode, debounceMs);
+    return true;
 }
 
 inline bool PulsePeripheral::sendPulses(uint8_t localChannel, uint16_t count,
@@ -171,13 +159,8 @@ inline bool PulsePeripheral::sendPulses(uint8_t localChannel, uint16_t count,
     const int idx = mapChannel(localChannel);
     if (!_active || idx < 0) return false;
     auto* ch = _channels[static_cast<uint8_t>(idx)];
-    if (!ch || !ch->startPulseTrain(count, pulseLengthMs, pauseLengthMs, startDelayMs)) return false;
-    if (!_readerPolling) {
-        Task::disable();
-        setInterval(ch->writerDelayMs());
-        Task::enable();
-    }
-    return true;
+    if (!ch || !ch->isOutput()) return false;
+    return ch->startPulseTrain(count, pulseLengthMs, pauseLengthMs, startDelayMs);
 }
 
 inline bool PulsePeripheral::isInputChannel(uint8_t localChannel) const {
@@ -189,41 +172,9 @@ inline bool PulsePeripheral::isInputChannel(uint8_t localChannel) const {
 inline bool PulsePeripheral::setInhibit(bool active) {
     if (!_inhibitChannel) return false;
     auto* ch = channel(_inhibitChannel);
-    if (!ch || ch->pinMode() != OUTPUT) return false;
+    if (!ch || !ch->isOutput()) return false;
     ch->write(active ? HIGH : LOW);
     return true;
-}
-
-inline void PulsePeripheral::tick() {
-    if (!_active) return;
-    if (_readerPolling) {
-        for (uint8_t c = 1; c <= channelCount(); ++c) {
-            const int idx = mapChannel(c);
-            if (idx >= 0 && isInputChannel(c)) {
-                auto* ch = _channels[static_cast<uint8_t>(idx)];
-                if (ch) ch->checkDirty();
-            }
-        }
-    }
-
-    bool anyBusy = false;
-    uint16_t minDelay = 1;
-    for (uint8_t c = 1; c <= channelCount(); ++c) {
-        const int idx = mapChannel(c);
-        if (idx < 0) continue;
-        auto* ch = _channels[static_cast<uint8_t>(idx)];
-        if (!ch || ch->isInput()) continue;
-        ch->updateWriter();
-        if (ch->writerBusy()) {
-            anyBusy = true;
-            const auto d = ch->writerDelayMs();
-            if (d < minDelay) minDelay = d;
-        }
-    }
-    if (!_readerPolling) {
-        if (anyBusy) setInterval(minDelay);
-        else Task::disable();
-    }
 }
 
 } // namespace VMCBuddy
