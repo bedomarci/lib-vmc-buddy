@@ -5,9 +5,6 @@
 
 namespace VMCBuddy {
 
-/** Direction-configurable adapter for one three-signal pulse IDC.
- * Local CH1, CH2, INHIBIT contacts are IDC pins 8, 6, 4. Connector 1
- * maps to board pulse channels 1–3; connector 2 maps to channels 4–6. */
 class PulseIDC : public PulsePeripheral {
 public:
     using Mode = PulsePeripheral::Mode;

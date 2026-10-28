@@ -1,70 +1,63 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
 
-#include <Arduino.h> // Arduino framework compatibility
+#include <Arduino.h>
 #include <macros.h>
 
-namespace VMCBuddy
-{
-    struct PulseChannel
-    {
-        uint8_t index;
-        uint8_t interruptMode = DETACH_ISR;
-        uint8_t pinMode = INPUT;
-        uint8_t value = LOW;
-        bool isDirty = false;
-        unsigned long lastInterrupt = 0;
-        uint16_t debounce = DEFAULT_PULSE_DEBOUNCE;
-        const void* owner = nullptr;
+class Scheduler;
 
-        explicit PulseChannel(uint8_t index = 0, uint8_t interruptMode = DETACH_ISR,
-                              uint16_t debounce = DEFAULT_PULSE_DEBOUNCE)
-            : index(index), interruptMode(interruptMode), debounce(debounce)
-        {
-        }
-    };
+namespace VMCBuddy {
 
-    class Context
-    {
-    private:
-        // Private constructor to prevent instantiation
-        Context();
+struct _PulseChannel {
+    uint8_t index;
+    uint8_t interruptMode = DETACH_ISR;
+    uint8_t pinMode = INPUT;
+    uint8_t value = LOW;
+    bool isDirty = false;
+    unsigned long lastInterrupt = 0;
+    uint16_t debounce = DEFAULT_PULSE_DEBOUNCE;
+    const void* owner = nullptr;
 
-        // Destructor
-        ~Context() = default;
+    explicit _PulseChannel(uint8_t index = 0, uint8_t interruptMode = DETACH_ISR,
+                           uint16_t debounce = DEFAULT_PULSE_DEBOUNCE)
+        : index(index), interruptMode(interruptMode), debounce(debounce) {}
+};
 
-        static Context* instance;
+class Context {
+private:
+    Context();
+    ~Context() = default;
+    static Context* instance;
 
-    public:
-        BoardConfig boardConfig;
-        PulseChannel pulseConfiguration[LEN_PIN_INTERRUPTS];
-        // Deleted copy constructor and assignment operator to prevent copying
-        Context(const Context&) = delete;
-        Context& operator=(const Context&) = delete;
+public:
+    BoardConfig boardConfig;
+    _PulseChannel pulseConfiguration[LEN_PIN_INTERRUPTS];
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
 
-        // Provides access to the singleton instance
-        static Context* getInstance();
+    static Context* getInstance();
 
-        bool initialized = false;
+    void setScheduler(Scheduler* s) { _scheduler = s; }
+    Scheduler* scheduler() { return _scheduler; }
 
-        uint8_t shiftRegisterBits[LEN_SHIFT_REGISTER_BITS] = {};
-    };
+    bool initialized = false;
+    uint8_t shiftRegisterBits[LEN_SHIFT_REGISTER_BITS] = {};
 
-    inline Context::Context() : boardConfig(makeBoardConfig())
-    {
-        for (uint8_t i = 0; i < boardConfig.numPulses; ++i)
-            pulseConfiguration[i] = PulseChannel(i, boardConfig.detachIsr,
-                                                 boardConfig.defaultPulseDebounce);
-    }
+private:
+    Scheduler* _scheduler = nullptr;
+};
 
-    inline Context* Context::getInstance()
-    {
-        if (!instance)
-        {
-            instance = new Context();
-        }
-        return instance;
-    }
+inline Context::Context() : boardConfig(makeBoardConfig()) {
+    for (uint8_t i = 0; i < boardConfig.numPulses; ++i)
+        pulseConfiguration[i] = _PulseChannel(i, boardConfig.detachIsr,
+                                              boardConfig.defaultPulseDebounce);
+}
+
+inline Context* Context::getInstance() {
+    if (!instance) instance = new Context();
+    return instance;
+}
+
 } // VMCBuddy
 
 #endif //CONTEXT_H

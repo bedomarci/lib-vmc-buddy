@@ -1,6 +1,5 @@
 #include "VMCBuddy.h"
 #include <TaskScheduler.h>
-#include <PulseReader.h>
 #include <IO.h>
 
 namespace VMCBuddy {
@@ -9,11 +8,12 @@ VMCBuddy::VMCBuddy(Scheduler* scheduler, Print* serial)
     : _scheduler(scheduler), _serial(serial) {
     if (!_serial) _serial = &Serial;
     Log.begin(LOG_LEVEL_VERBOSE, _serial);
+    Context::getInstance()->setScheduler(scheduler);
 }
 
 void VMCBuddy::addPeripheral(IPeripheral* p) {
     _peripherals.push_back(p);
-    _scheduler->addTask(*p);
+    p->boot(Context::getInstance());
 }
 
 void VMCBuddy::begin() {
@@ -25,7 +25,6 @@ void VMCBuddy::begin() {
     for (uint8_t i = 0; i < cfg.numPulses; ++i)
         pinMode(cfg.pulseInGpio[i], INPUT);
 
-    // begin all registered peripherals
     for (auto* p : _peripherals) {
         if (p->begin()) Log.infoln("Peripheral started: %s", p->name());
         else Log.errorln("Peripheral failed to start: %s", p->name());
@@ -46,7 +45,11 @@ void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode, uint16_t
         Log.errorln("Pulse line %i is not an INPUT.", index + 1);
         return;
     }
-    PulseReader::setInterruptMode(index, mode, debounce);
+    // ponytail: PulseReader removed, interrupt mode set directly
+    auto& pulse = context->pulseConfiguration[index];
+    if (mode != DETACH_ISR && mode != CHANGE && mode != RISING && mode != FALLING) return;
+    pulse.interruptMode = mode;
+    pulse.debounce = debounce;
 }
 
 void VMCBuddy::pinModePulse(uint8_t index, uint8_t mode) { IO::pinModePulse(index, mode); }

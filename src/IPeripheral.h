@@ -7,24 +7,18 @@
 
 namespace VMCBuddy {
 
-/**
- * Base class for every hardware or software peripheral on the board.
- * All peripherals are Tasks — they can be added to the cooperative
- * scheduler and polled automatically.
- *
- * Subclass and override begin(), end(), and name(). The VMCBuddy
- * facade calls begin() on every registered peripheral during its
- * own begin().
- */
+class Context;
+
 class IPeripheral : public Task {
 public:
     virtual ~IPeripheral() = default;
 
-    /** One-time hardware setup. Called by VMCBuddy::begin(). */
+    /** Register self with the scheduler. Called by VMCBuddy::addPeripheral().
+     *  Override to add one or more tasks via ctx->scheduler()->addTask(). */
+    virtual void boot(Context* ctx) { ctx->scheduler()->addTask(*this); }
+
     virtual bool begin() = 0;
-    /** Shut down and release resources. */
     virtual void end() = 0;
-    /** Short human-readable identifier for logging / introspection. */
     virtual const char* name() const = 0;
 
 protected:

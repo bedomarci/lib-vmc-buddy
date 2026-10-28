@@ -5,9 +5,6 @@
 
 namespace VMCBuddy {
 
-/** Direction-configurable adapter for the 10-pin pulse terminal.
- * Terminal pins 1–8 map directly to board pulse channels 1–8.
- * Any one of those local channels can be selected as INHIBIT. */
 class PulseTerminal : public PulsePeripheral {
 public:
     using Mode = PulsePeripheral::Mode;

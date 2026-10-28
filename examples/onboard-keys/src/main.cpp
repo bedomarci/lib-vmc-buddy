@@ -11,10 +11,6 @@ static_assert(std::is_base_of<VMCBuddy::IPeripheral, VMCBuddy::PulsePeripheral>:
               "PulsePeripheral must own the schedulable Task");
 static_assert(std::is_convertible<VMCBuddy::PulsePeripheral*, VMCBuddy::IPeripheral*>::value,
               "PulsePeripheral must expose one unambiguous IPeripheral base");
-static_assert(!std::is_base_of<VMCBuddy::IPeripheral, VMCBuddy::PulseReader>::value,
-              "PulseReader must remain Task-free");
-static_assert(!std::is_base_of<VMCBuddy::IPeripheral, VMCBuddy::PulseWriter>::value,
-              "PulseWriter must remain Task-free");
 
 Scheduler scheduler;
 VMCBuddy::VMCBuddy board(&scheduler);
