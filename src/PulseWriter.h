@@ -58,7 +58,7 @@ inline void PulseWriter::end() {
 }
 
 inline bool PulseWriter::validTarget(uint8_t index) const {
-    return index < NUM_PULSE &&
+    return index < Context::getInstance()->boardConfig.numPulses &&
            Context::getInstance()->pulseConfiguration[index].pinMode == OUTPUT;
 }
 

@@ -3,7 +3,7 @@
 
 #include <IPeripheral.h>
 #include <EventHandler.h>
-#include <macros.h>
+#include <Context.h>
 
 namespace VMCBuddy {
 
@@ -28,14 +28,10 @@ protected:
     int oldAnalogButtonReadValue = 0;
     int newAnalogButtonReadValue = 0;
 
-    const int analogButtonValues[NUM_BUTTONS] = {
-        VAL_ANALOG_BTN1, VAL_ANALOG_BTN2, VAL_ANALOG_BTN3,
-        VAL_ANALOG_BTN4, VAL_ANALOG_BTN5, VAL_ANALOG_BTN6,
-    };
 };
 
 inline AnalogButtonReader::AnalogButtonReader() : IPeripheral() {
-    setInterval(TIME_ANALOG_BUTTON_READ_INTERVAL);
+    setInterval(Context::getInstance()->boardConfig.btnReadIntervalMs);
     setIterations(TASK_FOREVER);
     setCallback([this]() { this->readAnalogButtons(); });
 }
@@ -44,15 +40,16 @@ inline bool AnalogButtonReader::begin() { Task::enable(); _active = true; return
 inline void AnalogButtonReader::end() { Task::disable(); _active = false; }
 
 inline void AnalogButtonReader::readAnalogButtons() {
-    newAnalogButtonReadValue = analogRead(PIN_MCU_ANALOG_BTNS);
+    const auto& cfg = Context::getInstance()->boardConfig;
+    newAnalogButtonReadValue = analogRead(cfg.btnAdc);
     int delta = abs(newAnalogButtonReadValue - oldAnalogButtonReadValue);
-    if (delta > TOLERANCE_ANALOG_BUTTONS_CHANGE) {
-        if (newAnalogButtonReadValue < TOLERANCE_ANALOG_BUTTONS_CHANGE) {
+    if (delta > cfg.btnTolerance) {
+        if (newAnalogButtonReadValue < cfg.btnTolerance) {
             EventHandler::trigger(Event::BUTTON_RELEASE, -1);
         } else {
-            for (int i = 0; i < NUM_BUTTONS; i++) {
-                if (newAnalogButtonReadValue > analogButtonValues[i] - TOLERANCE_ANALOG_BUTTONS_CHANGE &&
-                    newAnalogButtonReadValue < analogButtonValues[i] + TOLERANCE_ANALOG_BUTTONS_CHANGE) {
+            for (uint8_t i = 0; i < cfg.numButtons; i++) {
+                if (newAnalogButtonReadValue > cfg.btnThresholds[i] - cfg.btnTolerance &&
+                    newAnalogButtonReadValue < cfg.btnThresholds[i] + cfg.btnTolerance) {
                     EventHandler::trigger(Event::BUTTON_PRESS, i);
                 }
             }

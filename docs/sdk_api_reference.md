@@ -17,7 +17,7 @@ This reference reflects the implementation currently present in `src/`, not ever
 | RS-485 | SP3485 transceiver | `RS485` class |
 | RS-232 | Dual SP3232EEY transceiver | `RS232` class |
 | Command interpreter | UART-based line parser | `CommandInterpreter` class |
-| Pin configuration | Board-level GPIO mapping | `macros.h` definitions with `BoardConfig` view and runtime validation |
+| Pin configuration | Board-level GPIO mapping | `Context::boardConfig`, initialized from the `macros.h` definitions |
 
 Board GPIO/net details: [Hardware Interfaces](./hardware_interfaces.md). Jumper wiring: [Jumper Configuration](./jumper_configuration.md). Browse all board and SDK pages from the [documentation index](./README.md).
 
@@ -44,7 +44,7 @@ Requires a `TaskScheduler::Scheduler*`. Optional `Print*` supplies ArduinoLog ou
 
 #### `begin()`
 
-Configures pins listed in `Context::pinConfiguration`, then calls `begin()` on each peripheral registered with `addPeripheral()`. Register peripheral instances before calling `begin()`.
+Configures shift-register, ADC, and pulse GPIOs from `Context::boardConfig`, then calls `begin()` on each peripheral registered with `addPeripheral()`. Register peripheral instances before calling `begin()`.
 
 #### `pinModePulse(uint8_t index, uint8_t mode)`
 
@@ -238,8 +238,6 @@ The six button thresholds are 3150, 2880, 2560, 1820, 1120, and 820 ADC units in
 ## Current source limitations
 
 - `setOnEventCallback()` lacks a definition.
-- `examples/onboard-keys` calls nonexistent `setOnChangeCallback()`.
-- `Pulse::pinMode` is not initialized in the `Pulse` constructor, though `setPulseInterruptMode()` checks it. Interrupt setup may therefore depend on indeterminate state in the current source.
 - Index methods do not consistently validate 0–7 / 0–5 bounds.
 - Wiegand has no SDK API; the hardware circuit is available but must be driven through raw GPIOs.
 
@@ -336,7 +334,7 @@ Command format: `CMD [ARG1] [ARG2] ...` (newline-terminated). Commands are match
 
 ### `VMCBuddy::BoardConfig`
 
-Pin values are defined once in `macros.h`. `BoardConfig` provides structured access to the same values through `boardCfg()`.
+`Context` owns the single active `BoardConfig` instance as `Context::getInstance()->boardConfig`. `macros.h` holds the pin literals and constructs that structured configuration once; runtime code reads the Context instance.
 
 | Field | Type | Description |
 |---|---|---|
@@ -346,7 +344,7 @@ Pin values are defined once in `macros.h`. `BoardConfig` provides structured acc
 | `ledSrBit[6]` | `uint8_t` | LED shift-register bit indices |
 | `uart0Tx`…`uart2Rx` | `uint8_t` | UART pin assignments |
 | `rs485TxEn` | `uint8_t` | RS-485 direction-control GPIO |
-| `rs232Ch1Tx`…`rs232Ch2Rx` | `uint8_t` | RS-232 channel GPIOs |
+| `rs232Ch1Tx`, `rs232Ch1Rx` | `uint8_t` | RS-232 channel 1 GPIOs; channel 2 reuses UART2 pins |
 | `wiegandInD0`…`wiegandOutD1` | `uint8_t` | Wiegand input/output GPIOs |
 | `btnAdc`, `btnThresholds[6]` | `uint8_t`/`uint16_t` | Analog button configuration |
 

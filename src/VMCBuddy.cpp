@@ -17,9 +17,13 @@ void VMCBuddy::addPeripheral(IPeripheral* p) {
 }
 
 void VMCBuddy::begin() {
-    // base I/O pin setup
-    for (const auto& it : Context::getInstance()->pinConfiguration)
-        pinMode(it.first, it.second);
+    const auto& cfg = Context::getInstance()->boardConfig;
+    pinMode(cfg.srData, OUTPUT);
+    pinMode(cfg.srClock, OUTPUT);
+    pinMode(cfg.srLatch, OUTPUT);
+    pinMode(cfg.btnAdc, INPUT);
+    for (uint8_t i = 0; i < cfg.numPulses; ++i)
+        pinMode(cfg.pulseInGpio[i], INPUT);
 
     // begin all registered peripherals
     for (auto* p : _peripherals) {
@@ -32,11 +36,13 @@ void VMCBuddy::begin() {
 }
 
 void VMCBuddy::setPulseInterruptMode(uint8_t index, const uint8_t mode, uint16_t debounce) {
+    auto* context = Context::getInstance();
     if (_initialized) {
         Log.errorln("Interrupts must be registered before begin().");
         return;
     }
-    if (Context::getInstance()->pulseConfiguration[index].pinMode != INPUT) {
+    if (index >= context->boardConfig.numPulses ||
+        context->pulseConfiguration[index].pinMode != INPUT) {
         Log.errorln("Pulse line %i is not an INPUT.", index + 1);
         return;
     }

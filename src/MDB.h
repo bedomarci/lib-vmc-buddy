@@ -87,7 +87,7 @@ inline MDB::~MDB() { if (_active) end(); }
 inline bool MDB::begin() {
     if (_active) return true;
     if (!UARTBus::acquire(2, UARTBus::MDB)) return false;
-    const auto& cfg = boardCfg();
+    const auto& cfg = Context::getInstance()->boardConfig;
     _txPin = cfg.uart2Tx;
     _rxPin = cfg.uart2Rx;
 

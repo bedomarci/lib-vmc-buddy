@@ -21,13 +21,16 @@ public:
                uint16_t offTimeMs, uint16_t startDelayMs = 0);
 
 protected:
-    bool validTarget(uint8_t index) const override { return index < NUM_LEDS; }
+    bool validTarget(uint8_t index) const override {
+        return index < Context::getInstance()->boardConfig.numLeds;
+    }
     void writeOut(uint8_t index, uint8_t state) override;
 };
 
 inline bool Led::begin() {
     PulseWriter::begin();
-    for (uint8_t i = 0; i < NUM_LEDS; ++i) set(i, LOW);
+    const uint8_t ledCount = Context::getInstance()->boardConfig.numLeds;
+    for (uint8_t i = 0; i < ledCount; ++i) set(i, LOW);
     return true;
 }
 
@@ -44,7 +47,7 @@ inline bool Led::blink(uint8_t ledIndex, uint16_t count, uint16_t onTimeMs,
 }
 
 inline void Led::writeOut(uint8_t index, uint8_t state) {
-    const uint8_t bit = Context::getInstance()->ledPins[index];
+    const uint8_t bit = Context::getInstance()->boardConfig.ledSrBit[index];
     IO::setShiftRegisterBit(bit, state ? LOW : HIGH); // active-low LED
 }
 

@@ -18,44 +18,50 @@ public:
 };
 
 inline void IO::pinModePulse(uint8_t index, uint8_t mode) {
-    if (index >= NUM_PULSE) return;
-    Context::getInstance()->pulseConfiguration[index].pinMode = mode;
+    auto* context = Context::getInstance();
+    if (index >= context->boardConfig.numPulses) return;
+    context->pulseConfiguration[index].pinMode = mode;
     if (mode == INPUT)
-        setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], LOW);
+        setShiftRegisterBit(context->boardConfig.pulseOutSrBit[index], LOW);
 }
 
 inline void IO::digitalWritePulse(uint8_t index, uint8_t state) {
-    if (index >= NUM_PULSE) return;
-    if (Context::getInstance()->pulseConfiguration[index].pinMode != OUTPUT) {
+    auto* context = Context::getInstance();
+    if (index >= context->boardConfig.numPulses) return;
+    if (context->pulseConfiguration[index].pinMode != OUTPUT) {
         Log.errorln("Pulse #%i is INPUT — cannot digitalWrite.", index + 1);
         return;
     }
-    setShiftRegisterBit(Context::getInstance()->pulseOutPins[index], state ? HIGH : LOW);
+    setShiftRegisterBit(context->boardConfig.pulseOutSrBit[index], state ? HIGH : LOW);
 }
 
 inline int IO::digitalReadPulse(uint8_t index) {
-    if (index >= NUM_PULSE) return LOW;
-    if (Context::getInstance()->pulseConfiguration[index].pinMode != INPUT) {
+    auto* context = Context::getInstance();
+    if (index >= context->boardConfig.numPulses) return LOW;
+    if (context->pulseConfiguration[index].pinMode != INPUT) {
         Log.errorln("Pulse #%i is OUTPUT — cannot digitalRead.", index + 1);
         return LOW;
     }
-    return digitalRead(Context::getInstance()->pulseInPins[index]);
+    return digitalRead(context->boardConfig.pulseInGpio[index]);
 }
 
 inline void IO::setShiftRegisterBit(uint8_t index, uint8_t value) {
-    if (index >= LEN_SHIFT_REGISTER_BITS) return;
-    Context::getInstance()->shiftRegisterBits[index] = value ? HIGH : LOW;
+    auto* context = Context::getInstance();
+    if (index >= context->boardConfig.srBitCount) return;
+    context->shiftRegisterBits[index] = value ? HIGH : LOW;
     render();
 }
 
 inline void IO::render() {
-    digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, LOW);
-    for (unsigned char bit : Context::getInstance()->shiftRegisterBits) {
-        digitalWrite(PIN_MCU_SHIFTREGISTER_DATA, bit ? HIGH : LOW);
-        digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, HIGH);
-        digitalWrite(PIN_MCU_SHIFTREGISTER_CLOCK, LOW);
+    const auto& context = *Context::getInstance();
+    const auto& cfg = context.boardConfig;
+    digitalWrite(cfg.srLatch, LOW);
+    for (uint8_t i = 0; i < cfg.srBitCount; ++i) {
+        digitalWrite(cfg.srData, context.shiftRegisterBits[i] ? HIGH : LOW);
+        digitalWrite(cfg.srClock, HIGH);
+        digitalWrite(cfg.srClock, LOW);
     }
-    digitalWrite(PIN_MCU_SHIFTREGISTER_LATCH, HIGH);
+    digitalWrite(cfg.srLatch, HIGH);
 }
 
 } // namespace VMCBuddy

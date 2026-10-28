@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <SerialPeripheral.h>
-#include <macros.h>
+#include <Context.h>
 #include <UARTBus.h>
 
 namespace VMCBuddy {
@@ -36,7 +36,7 @@ private:
 };
 
 inline RS232::RS232(uint8_t channel) : SerialPeripheral(), _channel(channel) {
-    const auto& cfg = boardCfg();
+    const auto& cfg = Context::getInstance()->boardConfig;
     _validChannel = channel == 1 || channel == 2;
     if (!_validChannel) return;
     if (channel == 1) {
@@ -45,8 +45,8 @@ inline RS232::RS232(uint8_t channel) : SerialPeripheral(), _channel(channel) {
         _rx = cfg.rs232Ch1Rx;
     } else {
         _uartNum = 2;
-        _tx = cfg.rs232Ch2Tx;
-        _rx = cfg.rs232Ch2Rx;
+        _tx = cfg.uart2Tx;
+        _rx = cfg.uart2Rx;
     }
 }
 

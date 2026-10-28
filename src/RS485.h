@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <SerialPeripheral.h>
-#include <macros.h>
+#include <Context.h>
 #include <UARTBus.h>
 
 namespace VMCBuddy {
@@ -34,7 +34,7 @@ private:
     bool _claimed = false;
 };
 
-inline RS485::RS485() : SerialPeripheral(), _dePin(boardCfg().rs485TxEn) {
+inline RS485::RS485() : SerialPeripheral(), _dePin(Context::getInstance()->boardConfig.rs485TxEn) {
     pinMode(_dePin, OUTPUT);
     digitalWrite(_dePin, LOW);
 }
@@ -58,7 +58,7 @@ inline bool RS485::begin(unsigned long baud, uint32_t config) {
 }
 
 inline bool RS485::beginDefaultSerial() {
-    const auto& cfg = boardCfg();
+    const auto& cfg = Context::getInstance()->boardConfig;
     _serial = &Serial2;
     _ownsSerial = true;
     Serial2.begin(_baud, _config, cfg.uart2Rx, cfg.uart2Tx);

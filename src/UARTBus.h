@@ -41,7 +41,7 @@ inline UARTBus::Owner UARTBus::owner(uint8_t uartNum) {
 
 /** Runtime sanity check for GPIO uniqueness and shift-register bit ranges. */
 inline bool validateBoardConfig() {
-    const auto& cfg = boardCfg();
+    const auto& cfg = Context::getInstance()->boardConfig;
     const uint8_t assigned[] = {
         cfg.srLatch, cfg.srData, cfg.srClock, cfg.btnAdc,
         cfg.pulseInGpio[0], cfg.pulseInGpio[1], cfg.pulseInGpio[2], cfg.pulseInGpio[3],

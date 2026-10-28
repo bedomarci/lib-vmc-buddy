@@ -59,8 +59,7 @@
 
 // ——— Constants ———
 #define LEN_SHIFT_REGISTER_BITS 16
-#define LEN_PIN_CONFIGURATION   12
-#define LEN_PIN_INTERRUPTS      8
+#define LEN_PIN_INTERRUPTS NUM_PULSE
 #define DETACH_ISR              0x00
 #define DEFAULT_ISR_MODE        DETACH_ISR
 #define DEFAULT_PULSE_DEBOUNCE  50
@@ -79,8 +78,8 @@
 // ——— RS-232 channel GPIOs ———
 #define PIN_RS232_CH1_TX 19
 #define PIN_RS232_CH1_RX 18
-#define PIN_RS232_CH2_TX 17
-#define PIN_RS232_CH2_RX 16
+#define PIN_RS232_CH2_TX PIN_UART2_TX
+#define PIN_RS232_CH2_RX PIN_UART2_RX
 
 // ——— Wiegand GPIOs ———
 #define PIN_WIEGAND_IN_D0  35
@@ -103,16 +102,16 @@ struct BoardConfig {
     uint8_t  numButtons;
     uint16_t btnReadIntervalMs;
     uint16_t btnTolerance;
-    uint16_t btnThresholds[6];
+    uint16_t btnThresholds[NUM_BUTTONS];
 
     // pulse
     uint8_t numPulses;
-    uint8_t pulseInGpio[8];
-    uint8_t pulseOutSrBit[8];
+    uint8_t pulseInGpio[NUM_PULSE];
+    uint8_t pulseOutSrBit[NUM_PULSE];
 
     // leds
     uint8_t numLeds;
-    uint8_t ledSrBit[6];
+    uint8_t ledSrBit[NUM_LEDS];
 
     // uart
     uint8_t uart0Tx, uart0Rx;
@@ -124,7 +123,6 @@ struct BoardConfig {
 
     // rs232
     uint8_t rs232Ch1Tx, rs232Ch1Rx;
-    uint8_t rs232Ch2Tx, rs232Ch2Rx;
 
     // wiegand
     uint8_t wiegandInD0, wiegandInD1;
@@ -139,8 +137,8 @@ struct BoardConfig {
  * Production board: October 26, 2026 — ESP32-WROOM-32E-N4.
  * All values verified against the 2026-10-26 schematic set.
  */
-inline const BoardConfig& boardCfg() {
-    static const BoardConfig cfg = {
+inline BoardConfig makeBoardConfig() {
+    const BoardConfig cfg = {
         // shift register
         PIN_MCU_SHIFTREGISTER_LATCH,
         PIN_MCU_SHIFTREGISTER_DATA,
@@ -176,7 +174,6 @@ inline const BoardConfig& boardCfg() {
 
         // rs232
         PIN_RS232_CH1_TX, PIN_RS232_CH1_RX,
-        PIN_RS232_CH2_TX, PIN_RS232_CH2_RX,
 
         // wiegand
         PIN_WIEGAND_IN_D0, PIN_WIEGAND_IN_D1,

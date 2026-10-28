@@ -65,7 +65,7 @@ inline int PulsePeripheral::pulseIndex(uint8_t localChannel) const {
 
 inline int PulsePeripheral::gpio(uint8_t localChannel) const {
     const int index = mapChannel(localChannel);
-    return index >= 0 ? boardCfg().pulseInGpio[index] : -1;
+    return index >= 0 ? Context::getInstance()->boardConfig.pulseInGpio[index] : -1;
 }
 
 inline bool PulsePeripheral::begin() {
@@ -86,7 +86,7 @@ inline void PulsePeripheral::end() {
     for (uint8_t channel = 1; channel <= channelCount(); ++channel) {
         const int index = mapChannel(channel);
         if (index < 0) continue;
-        detachInterrupt(boardCfg().pulseInGpio[index]);
+        detachInterrupt(Context::getInstance()->boardConfig.pulseInGpio[index]);
         PulseReader::setInterruptMode(index, DETACH_ISR);
         IO::pinModePulse(index, INPUT);
     }
