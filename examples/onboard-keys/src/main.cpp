@@ -2,14 +2,22 @@
 #include <assert.h>
 #include <VMCBuddy.h>
 #include <TaskScheduler.h>
-#include <PulseReader.h>
 #include <PulseIDC.h>
 #include <PulseTerminal.h>
 #include <EventHandler.h>
+#include <type_traits>
+
+static_assert(std::is_base_of<VMCBuddy::IPeripheral, VMCBuddy::PulsePeripheral>::value,
+              "PulsePeripheral must own the schedulable Task");
+static_assert(std::is_convertible<VMCBuddy::PulsePeripheral*, VMCBuddy::IPeripheral*>::value,
+              "PulsePeripheral must expose one unambiguous IPeripheral base");
+static_assert(!std::is_base_of<VMCBuddy::IPeripheral, VMCBuddy::PulseReader>::value,
+              "PulseReader must remain Task-free");
+static_assert(!std::is_base_of<VMCBuddy::IPeripheral, VMCBuddy::PulseWriter>::value,
+              "PulseWriter must remain Task-free");
 
 Scheduler scheduler;
 VMCBuddy::VMCBuddy board(&scheduler);
-VMCBuddy::PulseReader pulseReader;
 VMCBuddy::PulseIDC connector1(1, VMCBuddy::PulseIDC::Mode::Slave);
 VMCBuddy::PulseIDC connector2(2, VMCBuddy::PulseIDC::Mode::Master);
 VMCBuddy::PulseTerminal terminal(VMCBuddy::PulsePeripheral::Mode::Slave, 8);
@@ -32,10 +40,10 @@ void setup() {
     const bool masterInhibitInput = connector2.setInterruptMode(3, FALLING);
     const bool masterDataOutput = !connector2.setInterruptMode(1, FALLING);
     assert(slaveDataInput && slaveInhibitOutput && masterInhibitInput && masterDataOutput);
-    board.addPeripheral(&pulseReader);
     board.addPeripheral(&connector1);
     board.addPeripheral(&connector2);
     board.begin();
+    assert(!terminal.begin()); // channel ownership prevents connector overlap
     connector2.sendPulses(1, 2, 100, 100); // local CH1 -> board output channel 4
     connector1.setInhibit(true);            // Slave drives local INHIBIT
 }

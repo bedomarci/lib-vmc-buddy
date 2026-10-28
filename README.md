@@ -99,6 +99,7 @@ lib-vmc-buddy/
 │   ├── PulseIDC.h                     ← IDC pulse-input connector mapping
 │   ├── PulsePeripheral.h              ← Shared pulse mode/inhibit API
 │   ├── PulseTerminal.h                ← 10-pin pulse terminal mapping
+│   ├── Relay.h                         ← Two relay-named pulse outputs
 │   ├── Led.h                          ← Onboard LED controller
 │   ├── AnalogButtonReader.h           ← ADC button reader
 │   ├── MDB*.h / RS*.h                  ← Serial interface layers
@@ -151,18 +152,19 @@ pio device monitor --baud 115200
 #include <Arduino.h>
 #include <VMCBuddy.h>
 #include <TaskScheduler.h>
-#include <PulseReader.h>
+#include <PulseIDC.h>
 #include <AnalogButtonReader.h>
 #include <Led.h>
 
 Scheduler scheduler;
 VMCBuddy::VMCBuddy board(&scheduler);
-VMCBuddy::PulseReader pulseInputs;
+VMCBuddy::PulseIDC pulseInputs(1, VMCBuddy::PulseIDC::Mode::Slave);
 VMCBuddy::AnalogButtonReader buttons;
 VMCBuddy::Led leds;
 
 void setup() {
     Serial.begin(115200);
+    pulseInputs.setInterruptMode(1, FALLING); // local CH1; reader runs in this peripheral
     board.addPeripheral(&pulseInputs);
     board.addPeripheral(&buttons);
     board.addPeripheral(&leds);
@@ -178,17 +180,16 @@ void loop() {
 ### Key APIs at a Glance
 
 ```cpp
-VMCBuddy::PulseWriter pulses;
+VMCBuddy::PulseTerminal pulses(VMCBuddy::PulseTerminal::Mode::Master);
 VMCBuddy::Led leds;
-board.addPeripheral(&pulses); // before board.begin()
+board.addPeripheral(&pulses); // before board.begin(); owns pulse channels 1–8
 board.addPeripheral(&leds);
-board.pinModePulse(7, OUTPUT);
 board.begin();
-pulses.sendPulses(7, 3, 500, 200);          // 3 pulses, 500ms high, 200ms pause
+pulses.sendPulses(8, 3, 500, 200);          // local channel 8, 3 pulses
 leds.blink(0, 5, 300, 100);                 // LED index 0, five blinks
 ```
 
-`setOnEventCallback()` is declared but not implemented. Pulse interrupt setup has an uninitialized mode-state issue; see [SDK limitations](./docs/sdk_api_reference.md#current-source-limitations).
+Pulse interrupt events are handled by each active `PulsePeripheral` for its mapped input channels. `setOnEventCallback()` is declared but not implemented; use `EventHandler` directly.
 
 ---
 

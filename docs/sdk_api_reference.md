@@ -6,8 +6,9 @@ This reference reflects the implementation currently present in `src/`, not ever
 
 | Hardware interface | Circuit on schematic | VMCBuddy SDK API |
 |--------------------|---------------------|------------------|
-| Pulse inputs | 8 optocoupled channels | `setPulseInterruptMode()` and event bus |
-| Pulse outputs | 8 optocoupler-driven channels | `PulseWriter::sendPulses()` |
+| Pulse inputs | 8 optocoupled channels | `PulsePeripheral::setInterruptMode()` and event bus |
+| Pulse outputs | 8 optocoupler-driven channels | `PulsePeripheral::sendPulses()` |
+| Relay outputs | Two relay-named pulse outputs | `Relay` (`CON-RELAY`, channels 7–8) |
 | Pulse IDC connectors | Two connectors for input groups 1–3 and 4–6 | `PulseIDC` mapping adapter |
 | Pulse terminal | 10-pin connector for channels 1–8 | `PulseTerminal` with selectable mode/inhibit |
 | Onboard LEDs | 6 LEDs via 74HC595D | `Led::set()` and `Led::blink()` |
@@ -52,23 +53,23 @@ Uses **zero-based** pulse index 0–7. `INPUT` clears the corresponding shift-re
 
 #### `setPulseInterruptMode(uint8_t index, uint8_t mode, uint16_t debounce)`
 
-Intended for zero-based input indexes 0–7. Supported Arduino interrupt modes are `CHANGE`, `RISING`, or `FALLING`; `DETACH_ISR` (0) leaves channel disabled. Default debounce is 50 ms. Call before `begin()`.
+Intended for zero-based board indexes 0–7. Supported Arduino interrupt modes are `CHANGE`, `RISING`, or `FALLING`; `DETACH_ISR` (0) leaves channel disabled. Default debounce is 50 ms. This configures a board channel; an active owning `PulsePeripheral` performs ISR registration and event dispatch. Prefer its connector-local `setInterruptMode()`.
 
 #### `addPeripheral(IPeripheral*)`
 
 Adds the task to `TaskScheduler` and the board's peripheral list. `VMCBuddy::begin()` then starts it. Peripheral objects must outlive the board.
 
-## Counted pulse output: `PulseWriter`
+## Counted pulse output: `PulsePeripheral::sendPulses()`
 
-`PulseWriter` is a reusable `IPeripheral`; its constructor does not register itself with a scheduler. Add it to the board, select pulse output mode, then call:
+`PulseWriter` is task-free phase logic used by `PulsePeripheral` and `Led`. Connector output is scheduled by its owning peripheral. Call:
 
 ```cpp
-bool sendPulses(uint8_t pulseIndex, uint16_t count,
-                uint16_t pulseLengthMs, uint16_t pauseLengthMs,
-                uint16_t startDelayMs = 0);
+bool PulsePeripheral::sendPulses(uint8_t localChannel, uint16_t count,
+                                 uint16_t pulseLengthMs, uint16_t pauseLengthMs,
+                                 uint16_t startDelayMs = 0);
 ```
 
-Pulse index is zero-based (0–7). The task emits exactly `count` HIGH pulses, using the requested pulse and pause durations, then disables itself. Calling `sendPulses()` while active restarts the sequence with new parameters.
+Connector-local channel numbers are 1-based; `PulseTerminal` accepts 1–8 and `PulseIDC` accepts 1–3. The owning peripheral emits exactly `count` HIGH pulses using the requested durations. Calling `sendPulses()` restarts that peripheral's sequence.
 
 ## Onboard LED controller: `Led`
 
@@ -80,11 +81,13 @@ bool blink(uint8_t ledIndex, uint16_t count, uint16_t onTimeMs,
            uint16_t offTimeMs, uint16_t startDelayMs = 0);
 ```
 
-`blink()` reuses `PulseWriter`'s restartable phase task; it returns false for an invalid LED index or pulse parameters.
+`Led` owns its scheduler task and reuses `PulseWriter`'s phase logic; `blink()` returns false for an invalid LED index or pulse parameters.
 
 ## Shared pulse direction: `PulsePeripheral`
 
-`PulsePeripheral` is the common `PulseWriter`-derived peripheral base for `PulseIDC` and `PulseTerminal`. Master drives data channels and reads INHIBIT; Slave reads data channels and drives INHIBIT. It provides `setMode()`, `read()`, `setInterruptMode()`, inherited `sendPulses()`, and inhibit selection/control. `setInhibitChannel(1..channelCount)` selects the inhibit channel; zero disables it. `PulseIDC` fixes INHIBIT to local channel 3; `PulseTerminal` accepts any local channel 1–8. Select mode and configure input interrupts before `VMCBuddy::begin()`.
+`PulsePeripheral` is the single `IPeripheral`/Task owner for its connector. It inherits task-free `PulseReader` and `PulseWriter` behavior; its scheduler callback handles both output transitions and dirty input events for only its mapped channels. Configured input events are dispatched at 1 ms polling intervals; output-only pulse transitions use their requested deadlines. Master drives data channels and reads INHIBIT; Slave reads data channels and drives INHIBIT. It provides `setMode()`, `read()`, `setInterruptMode()`, `sendPulses()`, and inhibit selection/control. `setInhibitChannel(1..channelCount)` selects the inhibit channel; zero disables it. `PulseIDC` fixes INHIBIT to local channel 3; `PulseTerminal` accepts any local channel 1–8. Select mode and configure input interrupts before `VMCBuddy::begin()`.
+
+Each physical pulse channel has one active `PulsePeripheral` owner. Overlapping mappings fail `begin()`; register either a `PulseTerminal` or the overlapping IDC connector(s), not both.
 
 Master output uses the separate `PULSE-OUT-TTL-CHx` shift-register path. The production schematic does not electrically route that output back to either input connector.
 
@@ -114,7 +117,7 @@ The connector's physical `PULSE-EXT` nets are optoisolated inputs. In Master mod
 | `readInhibit()` | Read local INHIBIT in Master mode |
 | `pulseIndex(localChannel)` / `gpio(localChannel)` / `idcPin(localChannel)` | Resolve local role to board channel, GPIO, or IDC contact |
 
-The constructor is `PulseIDC(uint8_t connectorNumber, Mode mode=Mode::Slave)`. Register each `PulseIDC` plus one shared `PulseReader` with VMCBuddy.
+The constructor is `PulseIDC(uint8_t connectorNumber, Mode mode=Mode::Slave)`. Register each `PulseIDC` with VMCBuddy; no separate `PulseReader` task is needed.
 
 ## Pulse terminal connector
 
@@ -127,6 +130,20 @@ board.addPeripheral(&terminal);
 
 Terminal pins 1–8 carry external pulse channels 1–8; pin 9 is `VCC-IN`, pin 10 is `GND`. Constructor: `PulseTerminal(Mode mode=Mode::Slave, uint8_t inhibitChannel=0)`. `read()`, `setInterruptMode()`, `sendPulses()`, `readInhibit()`, and `setInhibit()` follow the selected direction. Master outputs use separate `PULSE-OUT-TTL-CHx` nets; the schematic does not connect them back to this terminal.
 
+## Relay outputs
+
+`Relay` implements `IPeripheral` and controls the two shift-register outputs aliased as `PIN_SR_RELAY1` and `PIN_SR_RELAY2`. They map to pulse output channels 7 and 8 (shift-register bits 9 and 8). Channel numbers are 1-based:
+
+```cpp
+VMCBuddy::Relay relays;
+board.addPeripheral(&relays);
+board.begin();
+relays.set(1, true);  // assert relay output 1
+relays.set(2, false); // deassert relay output 2
+```
+
+`set(channel, active)` returns false for an invalid channel or before `begin()`. `Relay` claims pulse channels 7–8, so it cannot be used at the same time as a `PulseTerminal` that owns those channels. `CON-RELAY` exposes these output nets; the board does not include a separate relay driver.
+
 ### Declared, currently not implemented
 
 `setOnEventCallback()` is declared in `VMCBuddy.h` but has no definition in `VMCBuddy.cpp`. `EventHandler` below is the implemented event registration path.
@@ -137,21 +154,20 @@ Terminal pins 1–8 carry external pulse channels 1–8; pin 9 is `VCC-IN`, pin 
 #include <Arduino.h>
 #include <VMCBuddy.h>
 #include <TaskScheduler.h>
-#include <PulseWriter.h>
+#include <PulseTerminal.h>
 #include <Led.h>
 
 Scheduler scheduler;
 VMCBuddy::VMCBuddy board(&scheduler);
-VMCBuddy::PulseWriter pulses;
+VMCBuddy::PulseTerminal pulses(VMCBuddy::PulseTerminal::Mode::Master);
 VMCBuddy::Led leds;
 
 void setup() {
     Serial.begin(115200);
-    board.pinModePulse(6, OUTPUT);
     board.addPeripheral(&pulses);
     board.addPeripheral(&leds);
     board.begin();
-    pulses.sendPulses(6, 3, 250, 250);
+    pulses.sendPulses(7, 3, 250, 250);
     leds.blink(0, 3, 200, 200);
 }
 
@@ -204,9 +220,10 @@ Subscribe to `BUTTON_PRESS` or `BUTTON_RELEASE` in the same way. The callback is
 |-------|--------|------|
 | `Context` | `Context.h/.cpp` | Singleton pulse state, pin configuration, and shift-register shadow |
 | `IO` | `IO.h` | Pulse GPIO/shift-register I/O and 16-bit bit-banged render |
-| `PulseReader` | `PulseReader.h` | GPIO ISRs, debounce, deferred `PULSE_INT` dispatch |
-| `PulseWriter` | `PulseWriter.h` | Registered reusable Task for counted pulse output |
-| `Led` | `Led.h` | Onboard LED controller; blink reuses PulseWriter phases |
+| `PulseReader` | `PulseReader.h` | Task-free GPIO ISR, debounce, deferred `PULSE_INT` logic |
+| `PulseWriter` | `PulseWriter.h` | Task-free counted pulse phase logic |
+| `PulsePeripheral` | `PulsePeripheral.h` | One Task per connector; polls mapped reader state and advances writer |
+| `Led` | `Led.h` | Onboard LED controller; owns Task and reuses PulseWriter phases |
 | `AnalogButtonReader` | `AnalogButtonReader.h` | GPIO36 ADC sampling every 200 ms |
 
 Shift-register control nets from `macros.h` and the MCU sheet: DATA GPIO13, CLOCK GPIO5, LATCH GPIO21. The firmware writes 16 bits via `digitalWrite()`; no SPI peripheral is used.

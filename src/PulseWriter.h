@@ -1,112 +1,102 @@
 #ifndef PULSE_WRITER_H
 #define PULSE_WRITER_H
 
-#include <IPeripheral.h>
 #include <IO.h>
 
 namespace VMCBuddy {
 
-/** Reusable scheduled pulse generator for the eight pulse outputs.
- * Register one instance with VMCBuddy; sendPulses() restarts its task
- * for a finite pulse count. Durations are milliseconds. */
-class PulseWriter : public IPeripheral {
-public:
-    PulseWriter();
-
-    bool begin() override;
-    void end() override;
-    const char* name() const override { return "PulseWriter"; }
-
-    /** Start/restart a counted pulse train. Returns false for invalid
-     * channel, non-output mode, zero count, or zero pulse length. */
-    bool sendPulses(uint8_t pulseIndex, uint16_t count,
-                    uint16_t pulseLengthMs, uint16_t pauseLengthMs,
-                    uint16_t startDelayMs = 0);
-
+/** Task-free counted pulse behavior. Derived peripherals own scheduling. */
+class PulseWriter {
 protected:
+    PulseWriter() = default;
+    ~PulseWriter() = default;
+
+    void startWriter() { _ready = true; }
+    void stopWriter();
+    bool startPulseTrain(uint8_t index, uint16_t count,
+                         uint16_t pulseLengthMs, uint16_t pauseLengthMs,
+                         uint16_t startDelayMs = 0);
+    void updateWriter();
+    bool writerBusy() const { return _phase != Phase::Idle; }
+    uint16_t writerDelayMs() const;
+
     virtual bool validTarget(uint8_t index) const;
     virtual void writeOut(uint8_t index, uint8_t state);
 
 private:
     enum class Phase : uint8_t { Idle, Start, Pulse, Pause };
-    void tick();
-
+    bool _ready = false;
     uint8_t _target = 0;
     uint16_t _remaining = 0;
     uint16_t _pulseLengthMs = 0;
     uint16_t _pauseLengthMs = 0;
+    uint32_t _nextTransition = 0;
     Phase _phase = Phase::Idle;
 };
 
-inline PulseWriter::PulseWriter() : IPeripheral() {
-    setInterval(TASK_IMMEDIATE);
-    setIterations(TASK_FOREVER);
-    setCallback([this]() { tick(); });
-}
-
-inline bool PulseWriter::begin() {
-    _active = true;
-    return true;
-}
-
-inline void PulseWriter::end() {
-    Task::disable();
+inline void PulseWriter::stopWriter() {
     if (_phase == Phase::Pulse) writeOut(_target, LOW);
     _phase = Phase::Idle;
     _remaining = 0;
-    _active = false;
+    _ready = false;
 }
 
 inline bool PulseWriter::validTarget(uint8_t index) const {
-    return index < Context::getInstance()->boardConfig.numPulses &&
-           Context::getInstance()->pulseConfiguration[index].pinMode == OUTPUT;
+    auto* context = Context::getInstance();
+    return index < context->boardConfig.numPulses &&
+           context->pulseConfiguration[index].pinMode == OUTPUT;
 }
 
 inline void PulseWriter::writeOut(uint8_t index, uint8_t state) {
     IO::digitalWritePulse(index, state);
 }
 
-inline bool PulseWriter::sendPulses(uint8_t pulseIndex, uint16_t count,
-                                    uint16_t pulseLengthMs, uint16_t pauseLengthMs,
-                                    uint16_t startDelayMs) {
-    if (!_active || !validTarget(pulseIndex) || count == 0 || pulseLengthMs == 0)
+inline bool PulseWriter::startPulseTrain(uint8_t index, uint16_t count,
+                                         uint16_t pulseLengthMs, uint16_t pauseLengthMs,
+                                         uint16_t startDelayMs) {
+    if (!_ready || !validTarget(index) || count == 0 || pulseLengthMs == 0)
         return false;
 
     if (_phase == Phase::Pulse) writeOut(_target, LOW);
-    Task::disable();
-
-    _target = pulseIndex;
+    _target = index;
     _remaining = count;
     _pulseLengthMs = pulseLengthMs;
     _pauseLengthMs = pauseLengthMs;
     _phase = Phase::Start;
-    setInterval(startDelayMs ? startDelayMs : TASK_IMMEDIATE);
-    Task::enable();
+    _nextTransition = millis() + startDelayMs;
     return true;
 }
 
-inline void PulseWriter::tick() {
+inline void PulseWriter::updateWriter() {
+    if (!_ready || _phase == Phase::Idle ||
+        static_cast<int32_t>(millis() - _nextTransition) < 0) return;
+
+    const uint32_t now = millis();
     switch (_phase) {
     case Phase::Start:
     case Phase::Pause:
         writeOut(_target, HIGH);
         _phase = Phase::Pulse;
-        setInterval(_pulseLengthMs);
+        _nextTransition = now + _pulseLengthMs;
         break;
     case Phase::Pulse:
         writeOut(_target, LOW);
         if (--_remaining == 0) {
             _phase = Phase::Idle;
-            Task::disable();
         } else {
             _phase = Phase::Pause;
-            setInterval(_pauseLengthMs);
+            _nextTransition = now + _pauseLengthMs;
         }
         break;
     case Phase::Idle:
-        Task::disable();
         break;
     }
+}
+
+inline uint16_t PulseWriter::writerDelayMs() const {
+    if (_phase == Phase::Idle) return 1;
+    const int32_t remaining = static_cast<int32_t>(_nextTransition - millis());
+    return remaining > 0 ? static_cast<uint16_t>(remaining) : 1;
 }
 
 } // namespace VMCBuddy

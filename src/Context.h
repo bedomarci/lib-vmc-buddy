@@ -15,6 +15,7 @@ namespace VMCBuddy
         bool isDirty = false;
         unsigned long lastInterrupt = 0;
         uint16_t debounce = DEFAULT_PULSE_DEBOUNCE;
+        const void* owner = nullptr;
 
         explicit PulseChannel(uint8_t index = 0, uint8_t interruptMode = DETACH_ISR,
                               uint16_t debounce = DEFAULT_PULSE_DEBOUNCE)

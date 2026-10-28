@@ -15,7 +15,7 @@ Expand the VMC Buddy SDK with one pin-config source, a scheduler-owned periphera
 - Implement MDB/ICP 9-bit bit-bang on GPIO16/17, packet framing, and MDB peripheral callbacks.
 - Add cashless, bill-validator, and coin-changer MDB use-case base classes.
 - Add the UART `CommandInterpreter` as a scheduler-managed peripheral.
-- Make `PulseReader`, `AnalogButtonReader`, `PulseWriter`, and `Led` schedulable peripherals.
+- Keep pulse read/write behavior task-free; let each `PulsePeripheral` own one Task for its mapped inputs and outputs. Keep `AnalogButtonReader` and `Led` schedulable peripherals.
 - Add a shared mode-aware `PulsePeripheral` base, plus `PulseIDC` and `PulseTerminal` mappings with selectable INHIBIT channel.
 - Keep pulse output and onboard LED controls separate; `Led::blink()` reuses the counted pulse task phases.
 - Document the APIs and verify board examples build.
